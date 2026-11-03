@@ -1,0 +1,4 @@
+Div,Date,Time,HomeTeam,AwayTeam,FTHG,FTAG,FTR,HTHG,HTAG,HTR,Referee,HS,AS,HST,AST,HF,AF,HC,AC,HY,AY,HR,AR,AvgH,AvgD,AvgA,Avg>2.5,Avg<2.5,AvgCH,AvgCD,AvgCA,AvgC>2.5,AvgC<2.5,Unnamed: 105
+E0,16/08/2025,20:00,Team Alpha,Team Beta,2,1,H,1,0,H,Ref One,14,9,6,3,10,12,7,4,1,2,0,0,1.80,3.60,4.50,1.75,2.10,1.75,3.70,4.80,1.70,2.20,
+E0,17/08/2025,14:00,Team Gamma,Team Delta,0,0,D,0,0,D,Ref Two,8,11,2,4,9,8,3,6,2,1,0,1,2.60,3.20,2.80,2.05,1.80,2.50,3.25,2.90,2.10,1.76,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,

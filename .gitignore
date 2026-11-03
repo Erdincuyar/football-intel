@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Ham ve temiz veri git'e girmez (yeniden uretilebilir).
+data/raw/
+data/clean/
+data/*.duckdb
+data/*.duckdb.wal
+
+# Tahmin defteri girer: commit zamani, tahminin mac oncesi yapildiginin kanitidir.
+!data/predictions/
