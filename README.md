@@ -40,7 +40,7 @@ Bu komut `data/footintel.duckdb` ve `data/clean/*.parquet` dosyalarını yerine 
 
 ## Tahmin defteri ve otomasyon (Faz 4)
 
-Pazartesi ve Perşembe sabahı CI şunları yapar:
+CI her sabah (06:00 UTC) şunları yapar:
 1. football-data.co.uk fikstür listesini indirir.
 2. Önümüzdeki 10 gündeki, henüz tahmin edilmemiş maçlar için tüm pazarların olasılıklarını
    hesaplar (`pipelines/predict_upcoming.py`, model sürümü `src/footintel/models/registry.py`).

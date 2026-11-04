@@ -10,8 +10,11 @@ name: data
 
 on:
   schedule:
-    # football-data.co.uk Pazar ve Carsamba gecesi guncellenir; biz ertesi sabah calisiriz.
-    - cron: "0 6 * * 1,4"   # Pazartesi ve Persembe 06:00 UTC (09:00 TR)
+    # Her gun 06:00 UTC (09:00 TR). football-data.co.uk sonuclari Pazar/Carsamba gecesi,
+    # fikstur listesini ise hafta icinde parca parca gunceller (or. Carsamba gunu listede
+    # yalnizca alt lig maclari vardi). Gunluk calisma, her macin listeye girdigi ilk gun
+    # tahmin edilmesini saglar; defter ayni maci ikinci kez tahmin etmez.
+    - cron: "0 6 * * *"
   workflow_dispatch: {}      # Actions sekmesinden elle calistirma
   pull_request:
     paths:
