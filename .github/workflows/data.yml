@@ -33,7 +33,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -51,8 +51,11 @@ jobs:
       - name: Testler
         run: uv run pytest -q
 
-      - name: Veri hattini calistir
+      - name: Veri hattini calistir (football-data.co.uk)
         run: uv run python pipelines/build_football_data.py
+
+      - name: Understat ve ClubElo
+        run: uv run python pipelines/build_sources.py
 
       - name: Veriyi artifact olarak sakla
         uses: actions/upload-artifact@v4

@@ -107,3 +107,25 @@ def check_integrity(con: duckdb.DuckDBPyConnection) -> None:
     ).fetchone()[0]
     if orphans:
         raise ValueError(f"fact_odds: {orphans} satirin eslesen maci yok")
+
+
+def replace_table(con: duckdb.DuckDBPyConnection, table: str, df: pd.DataFrame) -> int:
+    """Kucuk tablolari tamamen yeniler (tek transaction)."""
+    cols = ", ".join(df.columns)
+    con.execute("BEGIN TRANSACTION")
+    try:
+        con.execute(f"DELETE FROM {table}")
+        con.register("replace_df", df)
+        con.execute(f"INSERT INTO {table} ({cols}) SELECT {cols} FROM replace_df")
+        con.unregister("replace_df")
+        con.execute("COMMIT")
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
+    return len(df)
+
+
+def save_team_aliases(con: duckdb.DuckDBPyConnection, source: str, mapping: dict[str, str]) -> None:
+    rows = [(source, name, tid) for name, tid in mapping.items()]
+    con.execute("DELETE FROM map_team_source WHERE source = ?", [source])
+    con.executemany("INSERT INTO map_team_source VALUES (?, ?, ?)", rows)

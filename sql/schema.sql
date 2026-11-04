@@ -67,3 +67,31 @@ CREATE TABLE IF NOT EXISTS fact_odds (
     odds        DOUBLE NOT NULL,
     PRIMARY KEY (match_id, market, selection, snapshot)
 );
+
+-- Faz 2 / Adim 2 ------------------------------------------------------------
+
+-- Understat mac istatistikleri (Super Lig haric 4 lig). football-data maciyla 1-1.
+CREATE TABLE IF NOT EXISTS fact_match_understat (
+    match_id            VARCHAR PRIMARY KEY,   -- fact_match.match_id
+    understat_match_id  INTEGER NOT NULL,
+    home_xg             DOUBLE,
+    away_xg             DOUBLE,
+    home_npxg           DOUBLE,
+    away_npxg           DOUBLE,
+    home_ppda           DOUBLE,   -- dusuk = yogun baski
+    away_ppda           DOUBLE,
+    home_deep           INTEGER,
+    away_deep           INTEGER,
+    home_xpts           DOUBLE,
+    away_xpts           DOUBLE
+);
+
+-- ClubElo puan gecmisi: her satir, puanin gecerli oldugu tarih araligi.
+-- Bir macin oncesindeki puani bulmak icin: valid_from <= mac_tarihi - 1 <= valid_to
+CREATE TABLE IF NOT EXISTS fact_team_elo (
+    team_id     VARCHAR NOT NULL,
+    valid_from  DATE NOT NULL,
+    valid_to    DATE NOT NULL,
+    elo         DOUBLE NOT NULL,
+    PRIMARY KEY (team_id, valid_from)
+);

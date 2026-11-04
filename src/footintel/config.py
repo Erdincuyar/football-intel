@@ -43,3 +43,26 @@ CURRENT_SEASON = "2627"
 def season_label(code: str) -> str:
     """'2526' -> '2025/26'"""
     return f"20{code[:2]}/{code[2:]}"
+
+
+def season_start_year(code: str) -> int:
+    """'2526' -> 2025"""
+    return 2000 + int(code[:2])
+
+
+# Understat lig kodlari (URL'deki yazim). Super Lig Understat'ta yok.
+UNDERSTAT_LEAGUES: dict[str, str] = {
+    "E0": "EPL",
+    "SP1": "La_liga",
+    "I1": "Serie_A",
+    "F1": "Ligue_1",
+}
+
+# ClubElo ulke kodlari. ClubElo'da Level=1 en ust lig demektir.
+CLUBELO_COUNTRIES: dict[str, str] = {
+    "E0": "ENG",
+    "SP1": "ESP",
+    "T1": "TUR",
+    "I1": "ITA",
+    "F1": "FRA",
+}
