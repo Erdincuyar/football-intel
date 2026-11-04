@@ -57,6 +57,12 @@ def side_base_rate(fd: pd.DataFrame, before: str, side: str, line: float) -> pd.
     return (hist[f"{side}_corners"] > line).groupby(hist["league"]).mean()
 
 
+def _bll(p: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """Mac bazinda ikili log loss (bootstrap icin)."""
+    p = np.clip(p, 1e-12, 1 - 1e-12)
+    return -(y * np.log(p) + (1 - y) * np.log(1 - p))
+
+
 def compare(fd, feats, sides, model: C.NBRegression, seasons: list[str]) -> dict:
     """Model vs lig ortalamasi vs Faz 3 modeli; lig bazinda ve toplam."""
     s = sides[sides["season"].isin(seasons)].dropna(subset=["corners", *model.features])
@@ -88,16 +94,20 @@ def compare(fd, feats, sides, model: C.NBRegression, seasons: list[str]) -> dict
                "u95_ll_model": binary_log_loss(g["p_corners_over95"].to_numpy(), y),
                "u95_ll_faz3": binary_log_loss(g["p95_phase3"].to_numpy(), y),
                "u95_ll_lig_ort": binary_log_loss(b95, y)}
+        mean, lo, hi = C.bootstrap_diff(-g["ll_corners"].to_numpy(), -g["ll_base"].to_numpy())
+        ci = {"lig": row["lig"], "toplam_fark": mean, "toplam_ci_alt": lo, "toplam_ci_ust": hi,
+              "anlamli_iyi": hi < 0}
         for side, line in (("home", 4.5), ("away", 4.5)):
             ys = (g[f"{side}_corners"] > line).to_numpy(float)
             br = g["league"].map(side_base_rate(fd, seasons[0], side, line)).to_numpy()
-            row[f"{side}45_ll_model"] = binary_log_loss(
-                g[f"p_{side}_corners_over{line:.1f}".replace(".", "")].to_numpy(), ys)
+            pm = g[f"p_{side}_corners_over{line:.1f}".replace(".", "")].to_numpy()
+            row[f"{side}45_ll_model"] = binary_log_loss(pm, ys)
             row[f"{side}45_ll_lig_ort"] = binary_log_loss(br, ys)
+            # Takim bazli pazar icin de mac bazinda fark ve guven araligi
+            m_, lo_, hi_ = C.bootstrap_diff(_bll(pm, ys), _bll(br, ys))
+            ci |= {f"{side}45_fark": m_, f"{side}45_ci_ust": hi_}
         rows.append(row)
-        mean, lo, hi = C.bootstrap_diff(-g["ll_corners"].to_numpy(), -g["ll_base"].to_numpy())
-        cis.append({"lig": row["lig"], "fark_model_eksi_lig_ort": mean, "ci_alt": lo,
-                    "ci_ust": hi, "anlamli_iyi": hi < 0})
+        cis.append(ci)
     return {"table": pd.DataFrame(rows).set_index("lig"),
             "ci": pd.DataFrame(cis).set_index("lig"), "pred": pred}
 
@@ -131,7 +141,8 @@ def main() -> None:
             model.coefficients().round(4).to_frame("katsayi"),
         "Dagilim parametresi r": f"{np.exp(model.log_r):.2f}",
         "Test 2025/26: log loss (kucuk = iyi)": test["table"].T.round(4),
-        "Test 2025/26: model - lig ortalamasi (toplam korner), %95 bootstrap": test["ci"].round(4),
+        "Test 2025/26: model - lig ortalamasi, %95 bootstrap (negatif = model iyi)":
+            test["ci"].round(4),
         "2026/27 (oynanan kisim): log loss": cur["table"].T.round(4),
         "2026/27: model - lig ortalamasi, %95 bootstrap": cur["ci"].round(4),
         "Faz 5 kapisi": "GECTI" if passed else "GECMEDI",
