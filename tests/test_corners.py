@@ -67,3 +67,21 @@ def test_bootstrap_diff_detects_real_difference():
     assert mean == pytest.approx(-0.05) and hi < 0
     mean, lo, hi = C.bootstrap_diff(a, a + rng.normal(0, 0.3, 800))
     assert lo < 0 < hi   # sadece gurultu: anlamli degil
+
+
+def test_live_markets_and_serialization():
+    from footintel.models import strength as S
+    reg = C.NBRegression(["is_home", "corner_rate", "supremacy"]).fit(synth())
+    reg2 = C.NBRegression.from_dict(reg.to_dict())
+    gm = S.FittedModel(S.ModelConfig(), ["a", "b"], 0.1, 0.25, np.array([0.3, -0.3]),
+                       np.array([-0.2, 0.2]))
+    cm = S.FittedModel(S.ModelConfig(family="negbin"), ["a", "b"], 1.6, 0.1,
+                       np.array([0.2, -0.2]), np.array([-0.1, 0.1]), log_r=2.3)
+    out = C.live_markets(reg2, gm, cm, "a", "b")
+    assert out["exp_home_corners"] > out["exp_away_corners"]   # guclu ev sahibi
+    assert 0 < out["p_home_corners_over55"] < out["p_home_corners_over45"] < 1
+    assert out == C.live_markets(reg, gm, cm, "a", "b")
+    with pytest.raises(ValueError, match="sut"):
+        C.live_markets(C.NBRegression.from_dict({**reg.to_dict(), "features": ["shot_rate"],
+                                                 "beta": [1.0, 0.1], "mean": [0.0],
+                                                 "std": [1.0]}), gm, cm, "a", "b")

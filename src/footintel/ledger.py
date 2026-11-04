@@ -91,6 +91,12 @@ def match_rows(fx: dict, goals: dict, score_matrix: np.ndarray, corners: dict | 
             p = corners[f"p_corners_over{line}"]
             rows += [(f"corners_ou{line}", "over", p, None),
                      (f"corners_ou{line}", "under", 1 - p, None)]
+        for side in ("home", "away"):
+            for line in ("35", "45", "55"):
+                key = f"p_{side}_corners_over{line}"
+                if key in corners:
+                    rows += [(f"{side}_corners_ou{line}", "over", corners[key], None),
+                             (f"{side}_corners_ou{line}", "under", 1 - corners[key], None)]
     return rows
 
 
@@ -164,10 +170,12 @@ def _outcome(market: str, sel: str, hg: int, ag: int, hc, ac) -> float | None:
         k = MAX_CORRECT_SCORE
         actual = f"{hg}-{ag}" if hg <= k and ag <= k else "other"
         return float(sel == actual)
-    if market.startswith("corners_ou"):
+    if "corners_ou" in market:
         if pd.isna(hc) or pd.isna(ac):
             return None
-        value, line = hc + ac, int(market[len("corners_ou"):]) / 10
+        side, line = market.split("corners_ou")
+        value = {"": hc + ac, "home_": hc, "away_": ac}[side]
+        line = int(line) / 10
     elif market.startswith("home_goals_ou"):
         value, line = hg, int(market[len("home_goals_ou"):]) / 10
     elif market.startswith("away_goals_ou"):
