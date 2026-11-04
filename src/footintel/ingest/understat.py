@@ -33,13 +33,20 @@ BASE_URL = "https://understat.com"
 RAW_SUBDIR = RAW_DIR / "understat"
 
 
+class SourceUnavailable(RuntimeError):
+    """Kaynak su an veri vermiyor (bakim sayfasi, engel vb.)."""
+
+
 def raw_path(league: str, season: str) -> Path:
     return RAW_SUBDIR / f"{league}_{season}.json"
 
 
 def download_all(*, force: bool = False) -> list[Path]:
     session = PoliteSession(delay=2.0, headers={"X-Requested-With": "XMLHttpRequest"})
-    session.get(BASE_URL).raise_for_status()  # cerezleri al
+    home = session.get(BASE_URL)  # cerezleri al
+    home.raise_for_status()
+    if "come back soon" in home.text.lower():
+        raise SourceUnavailable("Understat bakim sayfasi gosteriyor ('We will come back soon').")
     paths = []
     for league, slug in UNDERSTAT_LEAGUES.items():
         for season in SEASONS:
@@ -54,7 +61,7 @@ def download_all(*, force: bool = False) -> list[Path]:
                 data = response.json()
             except ValueError as exc:
                 # Hata ayiklamak icin sunucunun ne dondurdugunu goster.
-                raise ValueError(
+                raise SourceUnavailable(
                     f"{url}: JSON beklenirken baska bir cevap geldi "
                     f"(HTTP {response.status_code}, "
                     f"Content-Type={response.headers.get('Content-Type')!r}, "

@@ -86,14 +86,25 @@ def resolve(
 
 
 def build_understat(fd, cands, offline: bool):
+    """Understat erisilemezse None doner; hat ClubElo ile devam eder.
+
+    Resmi olmayan bir kaynaga bagimliyiz (Faz 1'deki FBref dersi): kaynak
+    kapandiginda tum hattin durmasi yerine o kaynagi atlayip bunu raporluyoruz.
+    """
     if not offline:
-        us_ingest.download_all()
-    frames = []
+        try:
+            us_ingest.download_all()
+        except us_ingest.SourceUnavailable as exc:
+            log.warning("Understat atlandi: %s", exc)
+            return None
+    frames: list[pd.DataFrame] = []
     for league in UNDERSTAT_LEAGUES:
         for season in SEASONS:
             path = us_ingest.raw_path(league, season)
             if path.exists():
                 frames.append(us_clean.parse_league_season(path, league, season))
+    if not frames:
+        return None
     us = pd.concat(frames, ignore_index=True)
     names = {}
     for (league, season), g in us.groupby(["league", "season"]):
@@ -126,7 +137,8 @@ def main() -> None:
     fd = pd.read_parquet(CLEAN_DIR / "matches_football_data.parquet")
     cands = candidates_by_league_season(fd)
 
-    us, us_map, us_review, us_err = build_understat(fd, cands, args.offline)
+    us_result = build_understat(fd, cands, args.offline)
+    us, us_map, us_review, us_err = us_result if us_result else (None, {}, [], [])
     session, elo_map, elo_review, elo_err = build_clubelo(cands, args.offline)
 
     review = pd.DataFrame(us_review + elo_review)
@@ -144,17 +156,19 @@ def main() -> None:
         )
 
     # Understat -> football-data mac baglantisi
-    linked, unlinked = us_clean.link_to_football_data(us, fd, us_map)
-    link_rate = (
-        us.assign(linked=~us["understat_match_id"].isin(unlinked["understat_match_id"]))
-        .groupby(["league", "season"])["linked"].mean().mul(100).round(1)
-    )
-    print("\nUnderstat maclarinin football-data ile eslesme orani (%):")
-    print(link_rate.to_string())
-    if len(unlinked):
-        print(unlinked[["league", "season", "match_date", "home_name", "away_name"]].head(20))
-    if (link_rate < 98).any():
-        raise SystemExit("Understat eslesme orani %98'in altinda; yukaridaki maclari incele.")
+    linked, link_rate = None, None
+    if us is not None:
+        linked, unlinked = us_clean.link_to_football_data(us, fd, us_map)
+        link_rate = (
+            us.assign(linked=~us["understat_match_id"].isin(unlinked["understat_match_id"]))
+            .groupby(["league", "season"])["linked"].mean().mul(100).round(1)
+        )
+        print("\nUnderstat maclarinin football-data ile eslesme orani (%):")
+        print(link_rate.to_string())
+        if len(unlinked):
+            print(unlinked[["league", "season", "match_date", "home_name", "away_name"]].head(20))
+        if (link_rate < 98).any():
+            raise SystemExit("Understat eslesme orani %98'in altinda; yukaridaki maclari incele.")
 
     # ClubElo gecmisleri
     elo_rows = []
@@ -173,11 +187,13 @@ def main() -> None:
     elo = elo.drop_duplicates(["team_id", "valid_from"])
 
     con = db.connect()
-    n_us = db.replace_table(con, "fact_match_understat", linked)
+    n_us = 0
+    if linked is not None:
+        n_us = db.replace_table(con, "fact_match_understat", linked)
+        db.save_team_aliases(con, "understat", us_map)
+        linked.to_parquet(CLEAN_DIR / "matches_understat.parquet", index=False)
     n_elo = db.replace_table(con, "fact_team_elo", elo)
-    db.save_team_aliases(con, "understat", us_map)
     db.save_team_aliases(con, "clubelo", elo_map)
-    linked.to_parquet(CLEAN_DIR / "matches_understat.parquet", index=False)
     elo.to_parquet(CLEAN_DIR / "team_elo.parquet", index=False)
     log.info("fact_match_understat: %d, fact_team_elo: %d satir", n_us, n_elo)
 
@@ -185,7 +201,10 @@ def main() -> None:
     if summary:
         with Path(summary).open("a", encoding="utf-8") as f:
             f.write(f"## Understat ve ClubElo\n\n{n_us} Understat maci, {n_elo} Elo satiri.\n\n")
-            f.write(f"Understat eslesme orani (%):\n\n```\n{link_rate.to_string()}\n```\n")
+            if link_rate is None:
+                f.write("**Understat bu calistirmada erisilemedi, atlandi.**\n")
+            else:
+                f.write(f"Understat eslesme orani (%):\n\n```\n{link_rate.to_string()}\n```\n")
             if not review.empty:
                 f.write("\nKontrol edilecek otomatik eslemeler:\n\n```\n"
                         f"{review.sort_values('score').to_string(index=False)}\n```\n")
