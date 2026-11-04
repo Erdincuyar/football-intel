@@ -57,6 +57,9 @@ jobs:
       - name: Understat ve ClubElo
         run: uv run python pipelines/build_sources.py
 
+      - name: Kendi Elo modelimiz
+        run: uv run python pipelines/build_elo.py
+
       - name: Veriyi artifact olarak sakla
         uses: actions/upload-artifact@v4
         with:

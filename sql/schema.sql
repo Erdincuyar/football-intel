@@ -95,3 +95,12 @@ CREATE TABLE IF NOT EXISTS fact_team_elo (
     elo         DOUBLE NOT NULL,
     PRIMARY KEY (team_id, valid_from)
 );
+
+-- Kendi Elo modelimiz (features/elo.py). Mac ONCESI puanlar: tahmin ozelligi olarak
+-- kullanilmaya uygun, o mactan ve sonrasindan bilgi icermez.
+CREATE TABLE IF NOT EXISTS fact_match_elo (
+    match_id        VARCHAR PRIMARY KEY,
+    home_elo_pre    DOUBLE NOT NULL,
+    away_elo_pre    DOUBLE NOT NULL,
+    home_expected   DOUBLE NOT NULL   -- ev sahibinin beklenen skoru (0-1)
+);
