@@ -15,6 +15,22 @@ uv run pytest                               # testler
 uv run python pipelines/build_football_data.py   # veriyi indir, temizle, yükle
 ```
 
+## Veriyi almak
+
+football-data.co.uk **Türkiye'den erişime kapalı**. Bu yüzden veri hattı GitHub
+Actions'ta (yurt dışındaki sunucularda) çalışır: Pazartesi ve Perşembe sabahı otomatik,
+ya da **Actions → data → Run workflow** ile elle. Kapsama raporu her çalıştırmanın
+özet sayfasında görünür. Temiz veriyi bilgisayarına indirmek için
+([GitHub CLI](https://cli.github.com) gerekir, bir kez `gh auth login`):
+
+```bash
+gh run download --repo Erdincuyar/football-intel --name footintel-data --dir data
+```
+
+Bu komut `data/footintel.duckdb` ve `data/clean/*.parquet` dosyalarını yerine koyar.
+Erişimin olan bir ağdaysan hattı yerelde de çalıştırabilirsin:
+`uv run python pipelines/build_football_data.py`.
+
 ## Veri kaynakları
 
 | Kaynak | Kullanım | Not |
