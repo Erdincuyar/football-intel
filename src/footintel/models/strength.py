@@ -44,6 +44,7 @@ class ModelConfig:
     xi: float = 0.002              # zaman azalmasi, 1/gun. Yari omur = ln2 / xi
     penalty: float = 8.0           # hucum/savunma icin ridge cezasi
     max_days: int = 730            # bundan eski maclar kullanilmaz (hiz icin)
+    shot_weight: float = 0.0       # 0 = yalnizca gol; >0 = isabetli sutla harmanlanmis hedef
 
 
 @dataclass
@@ -121,6 +122,27 @@ def _count_ll(y, m, log_r, family):
     return ll, d_eta, d_logr
 
 
+def _shot_blend(d: pd.DataFrame, x: np.ndarray, y: np.ndarray, beta: float):
+    """Hedef = (1 - beta) * gol + beta * c * isabetli_sut.
+
+    Neden? Gol nadir ve sansa bagli bir olaydir; isabetli sut cok daha sik gorulur ve
+    takimin pozisyon uretme gucunu daha az gurultuyle olcer (bir tur "xG vekili").
+    c = egitim penceresindeki gol / isabetli sut orani (lig ortalamasi ~0.3). Boylece
+    hedef gol olceginde kalir. Sut verisi eksik maclarda yalnizca gol kullanilir.
+    Hedef artik tam sayi olmadigi icin olabilirlik "quasi-Poisson" olur: gradyan ve
+    tahmin ayni kalir, yalnizca sabit terim anlamini yitirir.
+    """
+    sh = d["home_shots_on_target"].to_numpy(dtype=float)
+    sa = d["away_shots_on_target"].to_numpy(dtype=float)
+    ok = ~(np.isnan(sh) | np.isnan(sa))
+    if not ok.any():
+        return x, y
+    c = (x[ok].sum() + y[ok].sum()) / max(sh[ok].sum() + sa[ok].sum(), 1.0)
+    x = np.where(ok, (1 - beta) * x + beta * c * np.nan_to_num(sh), x)
+    y = np.where(ok, (1 - beta) * y + beta * c * np.nan_to_num(sa), y)
+    return x, y
+
+
 def fit(
     matches: pd.DataFrame,
     ref_date: pd.Timestamp,
@@ -151,6 +173,8 @@ def fit(
     ai = d["away_team_id"].map(idx).to_numpy()
     x = d[home_col].to_numpy(dtype=float)
     y = d[away_col].to_numpy(dtype=float)
+    if config.shot_weight > 0:
+        x, y = _shot_blend(d, x, y, config.shot_weight)
     w = time_weights(d["match_date"], ref_date, config.xi)
 
     prom_idx = np.array([idx[t] for t in promoted if t in idx], dtype=int)
@@ -158,7 +182,8 @@ def fit(
     use_prior = len(prom_idx) > 0 and len(rel_idx) > 0
     is_prom = np.zeros(n_t, bool)
     is_prom[prom_idx] = True
-    use_rho = config.dixon_coles and config.family == "poisson"
+    # Harmanlanmis hedef tam sayi degil; tau yalnizca gercek skorlar icin tanimli.
+    use_rho = config.dixon_coles and config.family == "poisson" and config.shot_weight == 0
     use_r = config.family == "negbin"
     lam_pen = config.penalty
 

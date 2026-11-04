@@ -134,3 +134,23 @@ def test_walk_forward_predicts_with_past_only(sim):
                                 odds_over25_close=1.9, odds_under25_close=1.9), p, rates)
     assert ev.loc["X", "n"] == len(df)
     assert ev.loc["X", "1x2_logloss_model"] < np.log(3) + 0.1
+
+
+def test_shot_blend_keeps_goal_scale_and_handles_missing():
+    d = pd.DataFrame({"home_shots_on_target": [10.0, np.nan], "away_shots_on_target": [0.0, 4.0]})
+    x, y = np.array([2.0, 1.0]), np.array([1.0, 0.0])
+    bx, by = S._shot_blend(d, x, y, 0.5)
+    c = 3.0 / 10.0  # gol / isabetli sut (yalnizca sut verisi olan mac)
+    assert bx[0] == pytest.approx(0.5 * 2 + 0.5 * c * 10)
+    assert by[0] == pytest.approx(0.5 * 1 + 0.5 * c * 0)
+    assert (bx[1], by[1]) == (1.0, 0.0)  # sut verisi eksik: yalnizca gol
+
+
+def test_shot_weight_disables_rho_and_fits(sim):
+    df, *_ = sim
+    rng = np.random.default_rng(3)
+    df = df.assign(home_shots_on_target=df["home_goals"] * 3 + rng.integers(0, 3, len(df)),
+                   away_shots_on_target=df["away_goals"] * 3 + rng.integers(0, 3, len(df)))
+    m = S.fit(df, pd.Timestamp("2024-12-01"), S.ModelConfig(shot_weight=0.5))
+    assert m.success and m.rho == 0.0
+    assert S.score_matrix(m, "t00", "t01").sum() == pytest.approx(1)

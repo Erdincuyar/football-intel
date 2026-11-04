@@ -30,17 +30,20 @@ log = logging.getLogger("build_models")
 TUNE = ["2425"]
 TEST = ["2526"]
 CURRENT = ["2627"]
-GOAL_GRID = {"xi": [0.0005, 0.001, 0.002, 0.004], "penalty": [2.0, 8.0, 32.0, 64.0]}
-CORNER_GRID = {"family": ["poisson", "negbin"], "xi": [0.002, 0.004], "penalty": [8.0, 32.0]}
+GOAL_GRID = {"shot_weight": [0.0, 0.25, 0.5, 0.75], "xi": [0.001, 0.002, 0.004],
+             "penalty": [4.0, 8.0, 16.0]}
+CORNER_GRID = {"family": ["poisson", "negbin"], "xi": [0.002, 0.004, 0.008],
+               "penalty": [32.0, 64.0, 128.0]}
 
 
 def tune_goals(fd: pd.DataFrame) -> pd.DataFrame:
     rows = []
-    for xi, pen in itertools.product(GOAL_GRID["xi"], GOAL_GRID["penalty"]):
-        cfg = S.ModelConfig(xi=xi, penalty=pen)
+    for beta, xi, pen in itertools.product(*GOAL_GRID.values()):
+        cfg = S.ModelConfig(xi=xi, penalty=pen, shot_weight=beta)
         t = time.time()
         preds = B.run_all(fd, TUNE, cfg)
-        rows.append({"xi": xi, "penalty": pen, "score_logloss": -preds["ll_score"].mean(),
+        rows.append({"shot_weight": beta, "xi": xi, "penalty": pen,
+                     "score_logloss": -preds["ll_score"].mean(),
                      "seconds": round(time.time() - t, 1)})
         log.info("gol ayari %s", rows[-1])
     return pd.DataFrame(rows).sort_values("score_logloss").reset_index(drop=True)
@@ -71,7 +74,8 @@ def main() -> None:
 
     goal_grid = tune_goals(fd)
     gbest = goal_grid.iloc[0]
-    goal_cfg = S.ModelConfig(xi=float(gbest["xi"]), penalty=float(gbest["penalty"]))
+    goal_cfg = S.ModelConfig(xi=float(gbest["xi"]), penalty=float(gbest["penalty"]),
+                             shot_weight=float(gbest["shot_weight"]))
     corner_grid = tune_corners(fd, goal_cfg)
     cbest = corner_grid.iloc[0]
     corner_cfg = S.ModelConfig(family=str(cbest["family"]), dixon_coles=False,
@@ -85,13 +89,16 @@ def main() -> None:
                             f"korner {warn_if_edge(corner_grid, CORNER_GRID)}"),
     }
 
-    # Ablasyon: Dixon-Coles duzeltmesi ise yariyor mu? (ayar sezonunda)
-    no_dc = B.run_all(fd, TUNE, S.ModelConfig(dixon_coles=False, xi=goal_cfg.xi,
-                                              penalty=goal_cfg.penalty))
-    with_dc = B.run_all(fd, TUNE, goal_cfg)
-    sections["Dixon-Coles ablasyonu (2024/25, kesin skor log loss)"] = pd.DataFrame({
-        "bagimsiz_poisson": no_dc.groupby("league")["ll_score"].mean().mul(-1),
-        "dixon_coles": with_dc.groupby("league")["ll_score"].mean().mul(-1),
+    # Ablasyon (ayar sezonunda): Dixon-Coles ve sut verisi ayri ayri ne katiyor?
+    variants = {
+        "yalniz_gol_poisson": S.ModelConfig(dixon_coles=False, xi=goal_cfg.xi,
+                                            penalty=goal_cfg.penalty),
+        "yalniz_gol_dixon_coles": S.ModelConfig(xi=goal_cfg.xi, penalty=goal_cfg.penalty),
+        "secilen_model": goal_cfg,
+    }
+    sections["Ablasyon (2024/25, kesin skor log loss)"] = pd.DataFrame({
+        name: B.run_all(fd, TUNE, cfg).groupby("league")["ll_score"].mean().mul(-1)
+        for name, cfg in variants.items()
     }).round(4)
 
     all_preds = []
