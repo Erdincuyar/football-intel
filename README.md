@@ -29,6 +29,15 @@ gh run download --repo Erdincuyar/football-intel --name footintel-data --dir dat
 
 Bu komut `data/footintel.duckdb` ve `data/clean/*.parquet` dosyalarını yerine koyar.
 
+## Tahmin modelleri (Faz 3)
+
+- `src/footintel/models/strength.py`: Dixon-Coles gol modeli ve Negatif Binom/Poisson
+  korner modeli (zaman ağırlıklı, analitik gradyanlı). Skor matrisinden 1X2, KG,
+  Ü/A 1.5-2.5-3.5, doğru skor ve takım golleri; korner dağılımından korner Ü/A.
+- `src/footintel/models/backtest.py`: Walk-forward backtest. Her hafta yalnızca geçmiş
+  maçlarla yeniden fit edip piyasa ve basit baseline'larla karşılaştırır.
+- `pipelines/build_models.py`: 2024/25'te ayar, 2025/26'da test. Rapor CI özetinde.
+
 ## Keşifsel analiz (EDA)
 
 `notebooks/01_eda.ipynb` gol, korner, ev avantajı ve bahis piyasası analizini içerir.

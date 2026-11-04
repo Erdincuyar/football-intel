@@ -104,3 +104,26 @@ CREATE TABLE IF NOT EXISTS fact_match_elo (
     away_elo_pre    DOUBLE NOT NULL,
     home_expected   DOUBLE NOT NULL   -- ev sahibinin beklenen skoru (0-1)
 );
+
+-- Faz 3 ----------------------------------------------------------------------
+
+-- Walk-forward backtest tahminleri. Her satir, fit_date'ten ONCEKI maclarla egitilmis
+-- modelin o mac icin verdigi olasiliklar. Faz 5'teki degismez tahmin defterinin
+-- (ledger) gecmise donuk karsiligi.
+CREATE TABLE IF NOT EXISTS backtest_prediction (
+    match_id            VARCHAR PRIMARY KEY,
+    league              VARCHAR NOT NULL,
+    season              VARCHAR NOT NULL,
+    fit_date            DATE NOT NULL,
+    p_home              DOUBLE, p_draw DOUBLE, p_away DOUBLE,
+    p_btts              DOUBLE,
+    exp_home_goals      DOUBLE, exp_away_goals DOUBLE,
+    p_over15            DOUBLE, p_over25 DOUBLE, p_over35 DOUBLE,
+    p_home_over05       DOUBLE, p_home_over15 DOUBLE,
+    p_away_over05       DOUBLE, p_away_over15 DOUBLE,
+    ll_score            DOUBLE,   -- log P(gerceklesen kesin skor)
+    exp_corners         DOUBLE, exp_home_corners DOUBLE, exp_away_corners DOUBLE,
+    p_corners_over85    DOUBLE, p_corners_over95 DOUBLE,
+    p_corners_over105   DOUBLE, p_corners_over115 DOUBLE,
+    ll_corners          DOUBLE    -- log P(gerceklesen toplam korner)
+);
