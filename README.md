@@ -28,6 +28,23 @@ gh run download --repo Erdincuyar/football-intel --name footintel-data --dir dat
 ```
 
 Bu komut `data/footintel.duckdb` ve `data/clean/*.parquet` dosyalarını yerine koyar.
+
+## Keşifsel analiz (EDA)
+
+`notebooks/01_eda.ipynb` gol, korner, ev avantajı ve bahis piyasası analizini içerir.
+CI her çalıştırmada notebook'u gerçek veriyle çalıştırır ve HTML olarak saklar:
+
+```bash
+gh run download --repo Erdincuyar/football-intel --name eda-report --dir reports
+open reports/01_eda.html
+```
+
+Yerelde çalıştırmak için önce veriyi indir (yukarıda), sonra:
+
+```bash
+uv sync --group eda
+uv run jupyter lab notebooks/01_eda.ipynb
+```
 Erişimin olan bir ağdaysan hattı yerelde de çalıştırabilirsin:
 `uv run python pipelines/build_football_data.py`.
 

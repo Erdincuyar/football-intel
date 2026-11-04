@@ -13,3 +13,4 @@ data/*.duckdb.wal
 
 # Tahmin defteri girer: commit zamani, tahminin mac oncesi yapildiginin kanitidir.
 !data/predictions/
+reports/
