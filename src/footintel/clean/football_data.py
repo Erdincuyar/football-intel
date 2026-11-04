@@ -10,8 +10,13 @@ Bu modulde ogrenilecek temel fikirler:
 2. Deterministik kimlik: match_id ayni maci her calistirmada ayni koda
    cevirir. Boylece yeniden yukleme yinelenen satir uretmez.
 
-3. Dogrulama: temizlik sonunda mantiksal kontroller yapilir (ornegin isabetli
-   sut sayisi toplam suttan buyuk olamaz). Bozuk veri sessizce gecmez.
+3. Dogrulama iki seviyelidir:
+   - Yapisal hatalar (yinelenen mac, skorla uyusmayan sonuc) tum hatti durdurur,
+     cunku bunlar dosyanin kendisinin bozuk oldugunu gosterir.
+   - Tek bir istatistikteki imkansiz deger (isabetli sut > toplam sut) ise o
+     macin ilgili degerlerini NA yapar ve satira `quality_flags` notu duser.
+     Kaynak verilerde tek tuk yazim hatasi normaldir; bir hucre yuzunden 30
+     dosyalik hatti durdurmak yerine hatayi izole ediyor ve raporluyoruz.
 """
 
 from __future__ import annotations
@@ -75,6 +80,7 @@ OUTPUT_COLUMNS: list[str] = [
     "away_team_id",
     "result",
     "referee",
+    "quality_flags",
     *STAT_COLUMNS.values(),
     *ODDS_COLUMNS.values(),
 ]
@@ -132,13 +138,51 @@ def clean_matches(raw: pd.DataFrame, league: str, season: str) -> pd.DataFrame:
         + df["home_team_id"] + "-" + df["away_team_id"]
     )
 
+    df = quarantine_impossible_stats(df)
     df = df[OUTPUT_COLUMNS].reset_index(drop=True)
-    validate(df)
+    validate(df, context=f"{league} {season}")
     return df
 
 
-def validate(df: pd.DataFrame) -> None:
-    """Mantiksal kontroller. Biri bile basarisizsa hata verir, sessizce gecmez."""
+# (kontrol adi, buyuk olamayacak kolon, ust sinir kolonu)
+STAT_RULES: list[tuple[str, str, str]] = [
+    (f"{side}_{kind}", f"{side}_{small}", f"{side}_{big}")
+    for side in ("home", "away")
+    for kind, small, big in [
+        ("sot_gt_shots", "shots_on_target", "shots"),
+        ("ht_gt_ft", "goals_ht", "goals"),
+    ]
+]
+
+
+def quarantine_impossible_stats(df: pd.DataFrame) -> pd.DataFrame:
+    """Imkansiz istatistik ciftlerini NA yapar ve satira not duser.
+
+    Ornek: away_shots_on_target=6, away_shots=5 ise ikisinden hangisinin yanlis
+    oldugunu bilemeyiz; bu yuzden ikisini de NA yapariz. Mac sonu golu (FTHG)
+    ise sonuc ve skor icin kritik oldugundan asla silinmez; ilk yari golu
+    hataliysa yalnizca ilk yari degeri NA olur.
+    """
+    df = df.copy()
+    flags = pd.Series("", index=df.index, dtype="string")
+    for name, small, big in STAT_RULES:
+        bad = (df[small] > df[big]).fillna(False).astype(bool)
+        if not bad.any():
+            continue
+        log.warning(
+            "%s: %d macta %s > %s, degerler NA yapildi: %s",
+            name, bad.sum(), small, big, df.loc[bad, "match_id"].tolist(),
+        )
+        df.loc[bad, small] = pd.NA
+        if not big.endswith("_goals"):
+            df.loc[bad, big] = pd.NA
+        flags[bad] = flags[bad] + name + ";"
+    df["quality_flags"] = flags.str.rstrip(";").replace("", pd.NA)
+    return df
+
+
+def validate(df: pd.DataFrame, context: str = "") -> None:
+    """Yapisal kontroller. Biri bile basarisizsa hata verir, sessizce gecmez."""
     problems: list[str] = []
 
     if df["match_id"].duplicated().any():
@@ -148,23 +192,22 @@ def validate(df: pd.DataFrame) -> None:
     if (df["home_team_id"] == df["away_team_id"]).any():
         problems.append("ev sahibi ve deplasman ayni takim")
 
-    for side in ("home", "away"):
-        shots, on_target = df[f"{side}_shots"], df[f"{side}_shots_on_target"]
-        if (on_target > shots).fillna(False).any():
-            problems.append(f"{side}: isabetli sut > toplam sut")
-        if (df[f"{side}_goals_ht"] > df[f"{side}_goals"]).fillna(False).any():
-            problems.append(f"{side}: ilk yari golu > mac sonu golu")
+    for name, small, big in STAT_RULES:
+        bad = (df[small] > df[big]).fillna(False).astype(bool)
+        if bad.any():
+            problems.append(f"{name}: {df.loc[bad, 'match_id'].tolist()[:5]}")
 
     played = df["home_goals"].notna()
     expected = pd.Series(pd.NA, index=df.index, dtype="string")
     expected[played & (df["home_goals"] > df["away_goals"])] = "H"
     expected[played & (df["home_goals"] < df["away_goals"])] = "A"
     expected[played & (df["home_goals"] == df["away_goals"])] = "D"
-    if (expected[played] != df.loc[played, "result"]).any():
-        problems.append("FTR sonucu skorla uyusmuyor")
+    mismatch = played & (expected != df["result"]).fillna(True)
+    if mismatch.any():
+        problems.append(f"FTR sonucu skorla uyusmuyor: {df.loc[mismatch, 'match_id'].tolist()[:5]}")
 
     if problems:
-        raise ValueError("Veri dogrulama basarisiz: " + "; ".join(problems))
+        raise ValueError(f"Veri dogrulama basarisiz ({context}): " + "; ".join(problems))
 
 
 def coverage_report(df: pd.DataFrame) -> pd.DataFrame:
@@ -177,4 +220,5 @@ def coverage_report(df: pd.DataFrame) -> pd.DataFrame:
             "referee", "odds_home_avg", "odds_home_close", "odds_over25_avg"]
     report = df.groupby(["league", "season"])[cols].agg(lambda s: s.notna().mean() * 100)
     report.insert(0, "matches", df.groupby(["league", "season"]).size())
+    report["flagged"] = df.groupby(["league", "season"])["quality_flags"].count()
     return report.round(1)

@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS fact_match (
     away_team_id          VARCHAR NOT NULL REFERENCES dim_team (team_id),
     result                VARCHAR,            -- H / D / A
     referee               VARCHAR,
+    quality_flags         VARCHAR,            -- temizlikte NA yapilan degerlerin notu
     home_goals            INTEGER,
     away_goals            INTEGER,
     home_goals_ht         INTEGER,
