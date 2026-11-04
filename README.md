@@ -32,3 +32,23 @@ sql/             veritabanı şeması
 tests/           pytest testleri (fixtures/ = sentetik örnekler)
 data/            raw/ ve clean/ git'e girmez; predictions/ girer
 ```
+
+## Sık karşılaşılan sorunlar
+
+**`CERTIFICATE_VERIFY_FAILED: self-signed certificate`**: Bilgisayarındaki bir
+antivirüs (HTTPS tarama), kurum VPN'i veya ağ filtresi bağlantıya kendi sertifikasını
+koyuyor. Kod, `truststore` ile işletim sisteminin sertifika deposunu kullanır; o
+sertifika Keychain'de güvenilir olarak kayıtlıysa sorun çözülür. Çözülmezse
+sertifikayı veren yazılımı bul:
+
+```bash
+openssl s_client -connect www.football-data.co.uk:443 -servername www.football-data.co.uk </dev/null 2>/dev/null | openssl x509 -noout -issuer
+```
+
+Çıkan `issuer` gerçek bir sertifika otoritesi değilse (örneğin bir antivirüs adı),
+o yazılımda HTTPS/web taramasını bu site için kapat. **SSL doğrulamasını kodda
+kapatma** (`verify=False`): bu, araya giren herkesin veriyi değiştirmesine izin verir.
+
+**`VIRTUAL_ENV ... does not match the project environment`**: Başka bir sanal ortam
+(örneğin pyenv) aktif. Zararsız bir uyarı; uv projenin kendi `.venv` ortamını kullanır.
+Susturmak için önce `pyenv deactivate` (veya `deactivate`) çalıştır.
