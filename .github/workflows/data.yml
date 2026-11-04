@@ -1,0 +1,65 @@
+# Veri hatti: football-data.co.uk'tan indir, temizle, DuckDB'ye yukle.
+#
+# Neden GitHub Actions? football-data.co.uk Turkiye'den erisime kapali. Actions
+# sunuculari yurt disinda calistigi icin siteye erisebilir. Ayrica Faz 4'teki
+# haftalik otomatik guncellemenin temelini simdiden kurmus oluyoruz.
+#
+# Ciktilar "artifact" olarak saklanir (90 gun). Indirmek icin:
+#   gh run download --repo Erdincuyar/football-intel --name footintel-data --dir data
+name: data
+
+on:
+  schedule:
+    # football-data.co.uk Pazar ve Carsamba gecesi guncellenir; biz ertesi sabah calisiriz.
+    - cron: "0 6 * * 1,4"   # Pazartesi ve Persembe 06:00 UTC (09:00 TR)
+  workflow_dispatch: {}      # Actions sekmesinden elle calistirma
+  pull_request:
+    paths:
+      - "src/**"
+      - "pipelines/**"
+      - "sql/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/data.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: data-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: uv kur
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Bagimliliklari kur
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Testler
+        run: uv run pytest -q
+
+      - name: Veri hattini calistir
+        run: uv run python pipelines/build_football_data.py
+
+      - name: Veriyi artifact olarak sakla
+        uses: actions/upload-artifact@v4
+        with:
+          name: footintel-data
+          path: |
+            data/clean/
+            data/footintel.duckdb
+          retention-days: 90
+          if-no-files-found: error

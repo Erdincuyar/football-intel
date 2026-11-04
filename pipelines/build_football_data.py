@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
+from pathlib import Path
 
 import pandas as pd
 
@@ -49,6 +51,14 @@ def main() -> None:
     report = coverage_report(matches)
     print("\nVeri kapsama raporu (% dolu):")
     print(report.to_string())
+
+    # GitHub Actions'ta calisiyorsak raporu is ozetine (job summary) de yaz:
+    # boylece veriyi indirmeden GitHub sayfasinda gorebiliriz.
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with Path(summary).open("a", encoding="utf-8") as f:
+            f.write(f"## Veri kapsama raporu (% dolu)\n\n{n} mac yuklendi.\n\n")
+            f.write(f"```\n{report.to_string()}\n```\n")
 
 
 if __name__ == "__main__":

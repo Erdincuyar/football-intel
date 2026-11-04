@@ -48,7 +48,7 @@ def test_missing_stat_columns_become_na_not_zero():
 def test_validation_catches_impossible_shots(e0):
     broken = e0.copy()
     broken.loc[0, "home_shots_on_target"] = 99
-    with pytest.raises(ValueError, match="isabetli sut"):
+    with pytest.raises(ValueError, match="away_sot_gt_shots|home_sot_gt_shots"):
         validate(broken)
 
 
@@ -83,3 +83,22 @@ def test_load_is_idempotent(e0, tmp_path):
     assert con.execute("SELECT count(*) FROM fact_match").fetchone()[0] == 2
     assert con.execute("SELECT count(*) FROM fact_odds").fetchone()[0] == 20
     assert con.execute("SELECT count(*) FROM dim_team").fetchone()[0] == 4
+
+
+def test_impossible_shots_are_quarantined_not_fatal():
+    raw = read_raw_csv(FIXTURES / "sample_E0.csv")
+    raw.loc[0, "AST"] = 99  # sentetik hata: isabetli sut > toplam sut
+    df = clean_matches(raw, "E0", "2526")
+    assert pd.isna(df.loc[0, "away_shots_on_target"])
+    assert pd.isna(df.loc[0, "away_shots"])
+    assert df.loc[0, "quality_flags"] == "away_sot_gt_shots"
+    assert pd.isna(df.loc[1, "quality_flags"])
+    assert df.loc[0, "home_shots"] == 14  # diger degerlere dokunulmaz
+
+
+def test_wrong_ht_goals_keep_full_time_score():
+    raw = read_raw_csv(FIXTURES / "sample_E0.csv")
+    raw.loc[0, "HTHG"] = 5
+    df = clean_matches(raw, "E0", "2526")
+    assert pd.isna(df.loc[0, "home_goals_ht"])
+    assert df.loc[0, "home_goals"] == 2

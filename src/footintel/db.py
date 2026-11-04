@@ -29,7 +29,7 @@ ODDS_LAYOUT: dict[str, tuple[str, str, str]] = {
 
 MATCH_COLUMNS = [
     "match_id", "league_id", "season", "season_label", "match_date", "kickoff_time",
-    "home_team_id", "away_team_id", "result", "referee",
+    "home_team_id", "away_team_id", "result", "referee", "quality_flags",
     "home_goals", "away_goals", "home_goals_ht", "away_goals_ht",
     "home_shots", "away_shots", "home_shots_on_target", "away_shots_on_target",
     "home_corners", "away_corners", "home_fouls", "away_fouls",
