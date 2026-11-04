@@ -81,3 +81,21 @@ def download_all(*, force: bool = False) -> list[Path]:
             if not existed or season == CURRENT_SEASON or force:
                 time.sleep(REQUEST_DELAY_SECONDS)
     return paths
+
+
+FIXTURES_URL = "https://www.football-data.co.uk/fixtures.csv"
+
+
+def download_fixtures(run_date: str) -> Path:
+    """Onumuzdeki maclarin listesi (tum ligler tek dosyada, oranlarla birlikte).
+
+    Site bu dosyayi hafta icinde gunceller. Her calistirmanin kopyasini tarihle
+    sakliyoruz: hangi tahminin hangi fikstur listesiyle yapildigi izlenebilsin.
+    """
+    response = requests.get(FIXTURES_URL, headers=HEADERS, timeout=30)
+    response.raise_for_status()
+    path = RAW_SUBDIR / f"fixtures_{run_date}.csv"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(response.content)
+    log.info("Fikstur indirildi: %s (%d bayt)", path.name, len(response.content))
+    return path

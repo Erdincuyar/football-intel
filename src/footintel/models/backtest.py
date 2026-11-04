@@ -126,6 +126,8 @@ def evaluate(fd: pd.DataFrame, preds: pd.DataFrame, base_rates: pd.DataFrame) ->
     d = d.dropna(subset=["home_goals", "away_goals"])
     total = d["home_goals"] + d["away_goals"]
     rows = []
+    # Gecmis sezonu olmayan lig icin baseline NaN olur (hata yerine).
+    base_rates = base_rates.reindex(sorted(d["league"].unique()))
     for league, g in d.groupby("league"):
         idx = g.index
         y = outcome_matrix(g)

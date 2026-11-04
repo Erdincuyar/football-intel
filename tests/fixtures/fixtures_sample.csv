@@ -1,0 +1,4 @@
+Div,Date,Time,HomeTeam,AwayTeam,AvgH,AvgD,AvgA,Avg>2.5,Avg<2.5
+E0,07/11/2026,15:00,Team Alpha,Team Beta,2.00,3.50,4.00,1.90,1.95
+T1,08/11/2026,17:00,Team Gamma,Team Delta,1.50,4.20,6.50,,
+D1,08/11/2026,14:30,Other A,Other B,2.1,3.3,3.4,1.8,2.0

@@ -38,6 +38,29 @@ Bu komut `data/footintel.duckdb` ve `data/clean/*.parquet` dosyalarını yerine 
   maçlarla yeniden fit edip piyasa ve basit baseline'larla karşılaştırır.
 - `pipelines/build_models.py`: 2024/25'te ayar, 2025/26'da test. Rapor CI özetinde.
 
+## Tahmin defteri ve otomasyon (Faz 4)
+
+Pazartesi ve Perşembe sabahı CI şunları yapar:
+1. football-data.co.uk fikstür listesini indirir.
+2. Önümüzdeki 10 gündeki, henüz tahmin edilmemiş maçlar için tüm pazarların olasılıklarını
+   hesaplar (`pipelines/predict_upcoming.py`, model sürümü `src/footintel/models/registry.py`).
+3. Bunları `data/predictions/` altına **yeni** bir Parquet dosyası olarak yazar ve git'e
+   commit'ler. Defter yalnızca büyür: bir maç aynı model sürümüyle bir kez tahmin edilir,
+   var olan dosyanın üzerine yazılmaz. Commit zamanı maç saatinden önce olduğu için
+   tahminlerin sonradan değiştirilmediği herkes tarafından doğrulanabilir.
+4. Oynanan maçları değerlendirir (`pipelines/evaluate_ledger.py` → `prediction_eval`).
+
+### Arayüz
+
+```bash
+gh run download --repo Erdincuyar/football-intel --name footintel-data --dir data
+uv sync --group app
+uv run streamlit run app/Home.py
+```
+
+Ana sayfa yaklaşan maçların olasılıklarını, **Model Performansı** sayfası canlı defterin ve
+walk-forward backtest'in sonuçlarını (piyasayla kıyas, kalibrasyon) gösterir.
+
 ## Keşifsel analiz (EDA)
 
 `notebooks/01_eda.ipynb` gol, korner, ev avantajı ve bahis piyasası analizini içerir.
