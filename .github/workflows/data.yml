@@ -61,6 +61,9 @@ jobs:
       - name: Kendi Elo modelimiz
         run: uv run python pipelines/build_elo.py
 
+      - name: "Faz 3: gol ve korner modelleri (walk-forward backtest)"
+        run: uv run python pipelines/build_models.py
+
       - name: EDA ozeti
         run: uv run python pipelines/eda_report.py
 
