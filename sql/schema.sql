@@ -127,3 +127,34 @@ CREATE TABLE IF NOT EXISTS backtest_prediction (
     p_corners_over105   DOUBLE, p_corners_over115 DOUBLE,
     ll_corners          DOUBLE    -- log P(gerceklesen toplam korner)
 );
+
+-- Faz 4 ----------------------------------------------------------------------
+
+-- Degistirilemez tahmin defteri. Kaynak: data/predictions/*.parquet (git'te, commit
+-- zamani tahminin mac oncesi yapildiginin kaniti). DuckDB'de UPDATE/DELETE engellenemez;
+-- Faz 8'de PostgreSQL'e gecince trigger ile engellenecek.
+CREATE TABLE IF NOT EXISTS prediction_log (
+    prediction_id       VARCHAR PRIMARY KEY,
+    match_key           VARCHAR NOT NULL,   -- lig-sezon-ev-dep (tarihten bagimsiz)
+    league              VARCHAR NOT NULL,
+    season              VARCHAR NOT NULL,
+    match_date          DATE NOT NULL,
+    kickoff_time        VARCHAR,
+    home_team           VARCHAR NOT NULL,
+    away_team           VARCHAR NOT NULL,
+    model_version       VARCHAR NOT NULL,
+    market              VARCHAR NOT NULL,   -- 1x2, ou25, btts, correct_score, corners_ou95 ...
+    selection           VARCHAR NOT NULL,   -- home/draw/away, over/under, yes/no, '2-1' ...
+    prob                DOUBLE NOT NULL,
+    market_prob         DOUBLE,             -- tahmin anindaki piyasa olasiligi (varsa)
+    created_at          TIMESTAMP NOT NULL,
+    data_snapshot_hash  VARCHAR NOT NULL
+);
+
+-- Mac bitince hesaplanir; defter degismez.
+CREATE TABLE IF NOT EXISTS prediction_eval (
+    prediction_id  VARCHAR PRIMARY KEY,
+    outcome        DOUBLE NOT NULL,   -- 1 = secenek gerceklesti
+    brier          DOUBLE NOT NULL,
+    log_loss       DOUBLE NOT NULL
+);

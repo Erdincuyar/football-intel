@@ -10,8 +10,11 @@ name: data
 
 on:
   schedule:
-    # football-data.co.uk Pazar ve Carsamba gecesi guncellenir; biz ertesi sabah calisiriz.
-    - cron: "0 6 * * 1,4"   # Pazartesi ve Persembe 06:00 UTC (09:00 TR)
+    # Her gun 06:00 UTC (09:00 TR). football-data.co.uk sonuclari Pazar/Carsamba gecesi,
+    # fikstur listesini ise hafta icinde parca parca gunceller (or. Carsamba gunu listede
+    # yalnizca alt lig maclari vardi). Gunluk calisma, her macin listeye girdigi ilk gun
+    # tahmin edilmesini saglar; defter ayni maci ikinci kez tahmin etmez.
+    - cron: "0 6 * * *"
   workflow_dispatch: {}      # Actions sekmesinden elle calistirma
   pull_request:
     paths:
@@ -25,7 +28,7 @@ on:
       - ".github/workflows/data.yml"
 
 permissions:
-  contents: read
+  contents: write   # tahmin defteri dosyalarini commit'lemek icin (yalnizca PR disi calistirmalar)
 
 concurrency:
   group: data-${{ github.ref }}
@@ -44,7 +47,7 @@ jobs:
           enable-cache: true
 
       - name: Bagimliliklari kur
-        run: uv sync --locked --group eda
+        run: uv sync --locked --group eda --group app
 
       - name: Lint
         run: uv run ruff check .
@@ -63,6 +66,26 @@ jobs:
 
       - name: "Faz 3: gol ve korner modelleri (walk-forward backtest)"
         run: uv run python pipelines/build_models.py
+
+      - name: "Faz 4: yaklasan maclari tahmin et ve deftere yaz"
+        # PR'larda deftere yazilmaz (--dry-run): defter yalnizca main'de buyur.
+        run: >
+          uv run python pipelines/predict_upcoming.py
+          ${{ github.event_name == 'pull_request' && '--dry-run' || '' }}
+
+      - name: Tahmin defterini degerlendir
+        run: uv run python pipelines/evaluate_ledger.py
+
+      - name: Tahmin defterini commit'le
+        # Commit zamani, tahminin mac oncesi yapildiginin herkese acik kanitidir.
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/predictions/
+          if git diff --cached --quiet; then echo "Yeni tahmin yok"; exit 0; fi
+          git commit -m "Tahmin defteri: $(date -u +%F)"
+          git push
 
       - name: EDA ozeti
         run: uv run python pipelines/eda_report.py

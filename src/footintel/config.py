@@ -6,15 +6,18 @@ eklemeyi tek satirlik bir degisiklige indirir.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = PROJECT_ROOT / "data"
+# FOOTINTEL_DATA_DIR: testlerde ve arayuz denemelerinde baska bir veri klasoru kullanmak icin.
+DATA_DIR = Path(os.environ.get("FOOTINTEL_DATA_DIR", PROJECT_ROOT / "data"))
 RAW_DIR = DATA_DIR / "raw"
 CLEAN_DIR = DATA_DIR / "clean"
 REFERENCE_DIR = DATA_DIR / "reference"
 DB_PATH = DATA_DIR / "footintel.duckdb"
+LEDGER_DIR = DATA_DIR / "predictions"
 SQL_DIR = PROJECT_ROOT / "sql"
 
 
