@@ -50,7 +50,16 @@ def download_all(*, force: bool = False) -> list[Path]:
             url = f"{BASE_URL}/getLeagueData/{slug}/{season_start_year(season)}"
             response = session.get(url, headers={"Referer": f"{BASE_URL}/league/{slug}"})
             response.raise_for_status()
-            data = response.json()  # gecerli JSON degilse burada hata verir
+            try:
+                data = response.json()
+            except ValueError as exc:
+                # Hata ayiklamak icin sunucunun ne dondurdugunu goster.
+                raise ValueError(
+                    f"{url}: JSON beklenirken baska bir cevap geldi "
+                    f"(HTTP {response.status_code}, "
+                    f"Content-Type={response.headers.get('Content-Type')!r}, "
+                    f"{len(response.content)} bayt): {response.text[:300]!r}"
+                ) from exc
             for key in ("dates", "teams"):
                 if key not in data:
                     raise ValueError(f"{url}: beklenen '{key}' alani yok; format degismis olabilir")
