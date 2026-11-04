@@ -28,7 +28,7 @@ from footintel.config import (
 )
 from footintel.ingest import clubelo as elo_ingest
 from footintel.ingest import understat as us_ingest
-from footintel.ingest.http import PoliteSession
+from footintel.ingest.http import PoliteSession, SourceUnavailable
 
 log = logging.getLogger("build_sources")
 ELO_START = pd.Timestamp("2020-07-01")
@@ -94,7 +94,7 @@ def build_understat(fd, cands, offline: bool):
     if not offline:
         try:
             us_ingest.download_all()
-        except us_ingest.SourceUnavailable as exc:
+        except SourceUnavailable as exc:
             log.warning("Understat atlandi: %s", exc)
             return None
     frames: list[pd.DataFrame] = []
@@ -139,7 +139,11 @@ def main() -> None:
 
     us_result = build_understat(fd, cands, args.offline)
     us, us_map, us_review, us_err = us_result if us_result else (None, {}, [], [])
-    session, elo_map, elo_review, elo_err = build_clubelo(cands, args.offline)
+    try:
+        session, elo_map, elo_review, elo_err = build_clubelo(cands, args.offline)
+    except SourceUnavailable as exc:
+        log.warning("ClubElo atlandi: %s", exc)
+        session, elo_map, elo_review, elo_err = None, {}, [], []
 
     review = pd.DataFrame(us_review + elo_review)
     if not review.empty:
@@ -171,11 +175,17 @@ def main() -> None:
             raise SystemExit("Understat eslesme orani %98'in altinda; yukaridaki maclari incele.")
 
     # ClubElo gecmisleri
+    elo = None
     elo_rows = []
-    histories = (
-        {c: pd.read_csv(elo_ingest.history_path(c), na_values=["None"]) for c in elo_map}
-        if args.offline else elo_ingest.download_histories(session, list(elo_map))
-    )
+    histories: dict[str, pd.DataFrame] = {}
+    try:
+        histories = (
+            {c: pd.read_csv(elo_ingest.history_path(c), na_values=["None"]) for c in elo_map}
+            if args.offline or session is None
+            else elo_ingest.download_histories(session, list(elo_map))
+        )
+    except SourceUnavailable as exc:
+        log.warning("ClubElo gecmisleri atlandi: %s", exc)
     for club, hist in histories.items():
         h = hist.assign(From=pd.to_datetime(hist["From"]), To=pd.to_datetime(hist["To"]))
         h = h[h["To"] >= ELO_START]
@@ -183,8 +193,9 @@ def main() -> None:
             "team_id": elo_map[club], "valid_from": h["From"].dt.date,
             "valid_to": h["To"].dt.date, "elo": h["Elo"],
         }))
-    elo = pd.concat(elo_rows, ignore_index=True).dropna(subset=["elo"])
-    elo = elo.drop_duplicates(["team_id", "valid_from"])
+    if elo_rows:
+        elo = pd.concat(elo_rows, ignore_index=True).dropna(subset=["elo"])
+        elo = elo.drop_duplicates(["team_id", "valid_from"])
 
     con = db.connect()
     n_us = 0
@@ -192,15 +203,19 @@ def main() -> None:
         n_us = db.replace_table(con, "fact_match_understat", linked)
         db.save_team_aliases(con, "understat", us_map)
         linked.to_parquet(CLEAN_DIR / "matches_understat.parquet", index=False)
-    n_elo = db.replace_table(con, "fact_team_elo", elo)
-    db.save_team_aliases(con, "clubelo", elo_map)
-    elo.to_parquet(CLEAN_DIR / "team_elo.parquet", index=False)
+    n_elo = 0
+    if elo is not None:
+        n_elo = db.replace_table(con, "fact_team_elo", elo)
+        db.save_team_aliases(con, "clubelo", elo_map)
+        elo.to_parquet(CLEAN_DIR / "team_elo.parquet", index=False)
     log.info("fact_match_understat: %d, fact_team_elo: %d satir", n_us, n_elo)
 
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with Path(summary).open("a", encoding="utf-8") as f:
             f.write(f"## Understat ve ClubElo\n\n{n_us} Understat maci, {n_elo} Elo satiri.\n\n")
+            if elo is None:
+                f.write("**ClubElo bu calistirmada erisilemedi, atlandi.**\n")
             if link_rate is None:
                 f.write("**Understat bu calistirmada erisilemedi, atlandi.**\n")
             else:

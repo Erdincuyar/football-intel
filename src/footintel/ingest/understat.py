@@ -25,16 +25,12 @@ from footintel.config import (
     UNDERSTAT_LEAGUES,
     season_start_year,
 )
-from footintel.ingest.http import PoliteSession
+from footintel.ingest.http import PoliteSession, SourceUnavailable
 
 log = logging.getLogger(__name__)
 
 BASE_URL = "https://understat.com"
 RAW_SUBDIR = RAW_DIR / "understat"
-
-
-class SourceUnavailable(RuntimeError):
-    """Kaynak su an veri vermiyor (bakim sayfasi, engel vb.)."""
 
 
 def raw_path(league: str, season: str) -> Path:

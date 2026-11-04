@@ -23,7 +23,7 @@ from pathlib import Path
 import pandas as pd
 
 from footintel.config import CURRENT_SEASON, RAW_DIR, SEASONS, season_start_year
-from footintel.ingest.http import PoliteSession
+from footintel.ingest.http import PoliteSession, SourceUnavailable
 
 log = logging.getLogger(__name__)
 
@@ -55,6 +55,8 @@ def download_snapshots(session: PoliteSession, *, force: bool = False) -> dict[s
         path = snapshot_path(season)
         if force or season == CURRENT_SEASON or not path.exists():
             response = session.get(f"{BASE_URL}/{snapshot_date(season).isoformat()}")
+            if response.status_code >= 500:
+                raise SourceUnavailable(f"ClubElo HTTP {response.status_code}: {response.url}")
             response.raise_for_status()
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(response.text, encoding="utf-8")
@@ -68,6 +70,8 @@ def download_histories(session: PoliteSession, clubs: list[str]) -> dict[str, pd
     for club in sorted(set(clubs)):
         url = f"{BASE_URL}/{re.sub(r'[^a-zA-Z0-9-]', '', club)}"
         response = session.get(url)
+        if response.status_code >= 500:
+            raise SourceUnavailable(f"ClubElo HTTP {response.status_code}: {url}")
         response.raise_for_status()
         df = _read_csv(response.text)
         if df.empty:
