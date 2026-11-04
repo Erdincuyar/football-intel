@@ -12,10 +12,19 @@ import time
 from pathlib import Path
 
 import requests
+import truststore
 
 from footintel.config import CURRENT_SEASON, LEAGUES, RAW_DIR, SEASONS
 
 log = logging.getLogger(__name__)
+
+# requests varsayilan olarak kendi sertifika listesini (certifi) kullanir ve
+# isletim sisteminin guvendigi sertifikalari gormez. Antivirus, kurum VPN'i veya
+# ag filtresi HTTPS trafigini kendi sertifikasiyla yeniden imzaliyorsa bu,
+# "self-signed certificate" hatasina yol acar. truststore, Python'un isletim
+# sisteminin sertifika deposunu (macOS Keychain, Windows Certificate Store)
+# kullanmasini saglar. Dogrulama KAPATILMAZ; sadece dogru depoya bakilir.
+truststore.inject_into_ssl()
 
 BASE_URL = "https://www.football-data.co.uk/mmz4281/{season}/{league}.csv"
 RAW_SUBDIR = RAW_DIR / "football_data"
@@ -42,7 +51,14 @@ def download_season(league: str, season: str, *, force: bool = False) -> Path | 
         return path
 
     url = BASE_URL.format(season=season, league=league)
-    response = requests.get(url, headers=HEADERS, timeout=30)
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=30)
+    except requests.exceptions.SSLError as exc:
+        raise RuntimeError(
+            f"{url} icin SSL sertifikasi dogrulanamadi. Aginizda HTTPS trafigini "
+            "inceleyen bir antivirus, VPN veya proxy olabilir. Ayrintilar icin "
+            "README'deki 'Sik karsilasilan sorunlar' bolumune bakin."
+        ) from exc
     if response.status_code == 404:
         log.warning("Kaynakta yok: %s", url)
         return None
