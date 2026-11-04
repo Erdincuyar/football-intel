@@ -30,10 +30,10 @@ log = logging.getLogger("build_models")
 TUNE = ["2425"]
 TEST = ["2526"]
 CURRENT = ["2627"]
-GOAL_GRID = {"shot_weight": [0.0, 0.25, 0.5, 0.75], "xi": [0.001, 0.002, 0.004],
-             "penalty": [4.0, 8.0, 16.0]}
+GOAL_GRID = {"shot_weight": [0.0, 0.25, 0.5], "xi": [0.001, 0.002, 0.004],
+             "penalty": [1.0, 2.0, 4.0, 8.0]}
 CORNER_GRID = {"family": ["poisson", "negbin"], "xi": [0.002, 0.004, 0.008],
-               "penalty": [32.0, 64.0, 128.0]}
+               "penalty": [8.0, 16.0, 32.0, 64.0]}
 
 
 def tune_goals(fd: pd.DataFrame) -> pd.DataFrame:
