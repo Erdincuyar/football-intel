@@ -19,6 +19,7 @@ on:
       - "pipelines/**"
       - "sql/**"
       - "tests/**"
+      - "notebooks/**"
       - "pyproject.toml"
       - "uv.lock"
       - ".github/workflows/data.yml"
@@ -43,7 +44,7 @@ jobs:
           enable-cache: true
 
       - name: Bagimliliklari kur
-        run: uv sync --locked
+        run: uv sync --locked --group eda
 
       - name: Lint
         run: uv run ruff check .
@@ -59,6 +60,22 @@ jobs:
 
       - name: Kendi Elo modelimiz
         run: uv run python pipelines/build_elo.py
+
+      - name: EDA ozeti
+        run: uv run python pipelines/eda_report.py
+
+      - name: EDA notebook'unu calistir (HTML rapor)
+        run: >
+          uv run jupyter nbconvert --to html --execute notebooks/01_eda.ipynb
+          --output-dir reports/
+
+      - name: EDA raporunu artifact olarak sakla
+        uses: actions/upload-artifact@v4
+        with:
+          name: eda-report
+          path: reports/
+          retention-days: 90
+          if-no-files-found: error
 
       - name: Veriyi artifact olarak sakla
         uses: actions/upload-artifact@v4
