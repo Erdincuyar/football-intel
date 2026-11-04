@@ -147,6 +147,17 @@ class NBRegression:
     def predict_mean(self, df: pd.DataFrame) -> np.ndarray:
         return np.exp(self._x(df) @ self.beta)
 
+    def to_dict(self) -> dict:
+        return {"features": self.features, "beta": self.beta.tolist(),
+                "mean": self.mean.tolist(), "std": self.std.tolist(), "log_r": self.log_r}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> NBRegression:
+        m = cls(list(d["features"]))
+        m.beta, m.mean, m.std = (np.asarray(d[k], dtype=float) for k in ("beta", "mean", "std"))
+        m.log_r, m.success = float(d["log_r"]), True
+        return m
+
     def coefficients(self) -> pd.Series:
         return pd.Series(self.beta, index=["sabit", *self.features])
 
@@ -199,3 +210,24 @@ def bootstrap_diff(a: np.ndarray, b: np.ndarray, n: int = 2000, seed: int = 0):
     idx = rng.integers(0, len(d), size=(n, len(d)))
     means = d[idx].mean(axis=1)
     return float(d.mean()), float(np.quantile(means, 0.025)), float(np.quantile(means, 0.975))
+
+
+def live_markets(model: NBRegression, goal_model: S.FittedModel, corner_model: S.FittedModel,
+                 home: str, away: str, shot_model: S.FittedModel | None = None
+                 ) -> dict[str, float]:
+    """Canli tahmin: tek mac icin toplam ve takim bazli korner pazarlari."""
+    gh, ga = goal_model.rates(home, away)
+    ch, ca = corner_model.rates(home, away)
+    sh, sa = shot_model.rates(home, away) if shot_model is not None else (np.nan, np.nan)
+    if any(f in model.features for f in ("shot_rate", "opp_shot_rate")) and shot_model is None:
+        raise ValueError("Secilen korner modeli sut ozelligi istiyor; shot_model verilmeli")
+    rows = pd.DataFrame({
+        "is_home": [1.0, 0.0], "corner_rate": [np.log(ch), np.log(ca)],
+        "supremacy": [gh - ga, ga - gh],
+        "shot_rate": [np.log(sh), np.log(sa)], "opp_shot_rate": [np.log(sa), np.log(sh)],
+    })
+    mh, ma = model.predict_mean(rows)
+    sides = pd.DataFrame({"match_id": ["x", "x"], "league": "", "season": "",
+                          "side": ["home", "away"], "corners": [np.nan, np.nan]})
+    out = evaluate_sides(sides, np.array([mh, ma]), model.log_r).iloc[0].to_dict()
+    return {k: float(v) for k, v in out.items() if k.startswith(("p_", "exp_"))}

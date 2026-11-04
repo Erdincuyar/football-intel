@@ -151,11 +151,8 @@ def main() -> None:
                        for k, v in sections.items())
     print(text)
 
-    (CLEAN_DIR / "corner_model.json").write_text(json.dumps({
-        "features": model.features, "beta": model.beta.tolist(), "mean": model.mean.tolist(),
-        "std": model.std.tolist(), "log_r": model.log_r, "train_seasons": FINAL_TRAIN,
-        "gate_passed": passed,
-    }, indent=2))
+    (CLEAN_DIR / "corner_model.json").write_text(json.dumps(
+        {**model.to_dict(), "train_seasons": FINAL_TRAIN, "gate_passed": passed}, indent=2))
     pd.concat([test["pred"], cur["pred"]]).to_parquet(
         CLEAN_DIR / "corner_backtest.parquet", index=False)
 

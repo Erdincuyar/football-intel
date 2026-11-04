@@ -15,6 +15,7 @@ Kullanim:
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 from pathlib import Path
@@ -28,15 +29,21 @@ from footintel.clean.football_data import read_raw_csv
 from footintel.config import CLEAN_DIR, CURRENT_SEASON, LEAGUES, LEDGER_DIR
 from footintel.ingest import football_data as fd_ingest
 from footintel.models import backtest as B
+from footintel.models import corners as C
 from footintel.models import strength as S
-from footintel.models.registry import CORNER_CONFIG, GOAL_CONFIG, MODEL_VERSION
+from footintel.models.registry import (
+    CORNER_CONFIG,
+    CORNER_MODEL_FILE,
+    GOAL_CONFIG,
+    MODEL_VERSION,
+)
 
 log = logging.getLogger("predict_upcoming")
 HORIZON_DAYS = 10
 
 
 def predict_league(results: pd.DataFrame, fixtures: pd.DataFrame, league: str,
-                   ref: pd.Timestamp) -> dict[str, tuple]:
+                   ref: pd.Timestamp, corner_reg: C.NBRegression) -> dict[str, tuple]:
     lg = results[results["league"] == league]
     teams = B.season_teams(lg)
     cur = teams.get((league, CURRENT_SEASON), set())
@@ -46,6 +53,9 @@ def predict_league(results: pd.DataFrame, fixtures: pd.DataFrame, league: str,
     gm = S.fit(lg, ref, GOAL_CONFIG, promoted=promoted, relegated=relegated)
     cm = S.fit(lg, ref, CORNER_CONFIG, home_col="home_corners", away_col="away_corners",
                promoted=promoted, relegated=relegated)
+    needs_shots = any(f in corner_reg.features for f in ("shot_rate", "opp_shot_rate"))
+    sm = S.fit(lg, ref, C.SHOT_CONFIG, home_col="home_shots", away_col="away_shots",
+               promoted=promoted, relegated=relegated) if needs_shots else None
     if not (gm.success and cm.success):
         log.warning("%s: optimizasyon tam yakinsamadi (gol=%s, korner=%s)",
                     league, gm.success, cm.success)
@@ -53,7 +63,8 @@ def predict_league(results: pd.DataFrame, fixtures: pd.DataFrame, league: str,
     for r in fx.itertuples(index=False):
         m = S.score_matrix(gm, r.home_team_id, r.away_team_id)
         out[r.match_key] = (S.goal_markets(m), m,
-                            S.corner_markets(cm, r.home_team_id, r.away_team_id))
+                            C.live_markets(corner_reg, gm, cm, r.home_team_id, r.away_team_id,
+                                           shot_model=sm))
     return out
 
 
@@ -84,9 +95,11 @@ def main() -> None:
              len(fixtures), len(fixtures) - len(new), len(new))
 
     results = played(pd.read_parquet(CLEAN_DIR / "matches_football_data.parquet"))
+    corner_reg = C.NBRegression.from_dict(
+        json.loads((CLEAN_DIR / CORNER_MODEL_FILE).read_text()))
     preds: dict[str, tuple] = {}
     for league in sorted(new["league"].unique()):
-        preds.update(predict_league(results, new, league, today))
+        preds.update(predict_league(results, new, league, today, corner_reg))
     rows = ledger.build(new, preds, MODEL_VERSION, now, ledger.snapshot_hash(results))
 
     view = rows[rows["market"].isin(["1x2", "ou25", "btts"])].pivot_table(
