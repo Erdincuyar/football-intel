@@ -24,6 +24,7 @@ import pandas as pd
 from footintel import ledger
 from footintel.analysis.eda import played
 from footintel.clean.fixtures import parse_fixtures
+from footintel.clean.football_data import read_raw_csv
 from footintel.config import CLEAN_DIR, CURRENT_SEASON, LEAGUES, LEDGER_DIR
 from footintel.ingest import football_data as fd_ingest
 from footintel.models import backtest as B
@@ -70,6 +71,10 @@ def main() -> None:
         path = max(fd_ingest.RAW_SUBDIR.glob("fixtures_*.csv"))
     else:
         path = fd_ingest.download_fixtures(run_date)
+    raw = read_raw_csv(path)
+    log.info("Fikstur dosyasi: %d satir, ligler: %s, tarihler: %s - %s", len(raw),
+             raw["Div"].value_counts().to_dict() if "Div" in raw else "Div kolonu yok",
+             raw["Date"].iloc[0] if len(raw) else "-", raw["Date"].iloc[-1] if len(raw) else "-")
     fixtures = parse_fixtures(path)
     dates = pd.to_datetime(fixtures["match_date"])
     fixtures = fixtures[(dates >= today) & (dates <= today + pd.Timedelta(days=HORIZON_DAYS))]
