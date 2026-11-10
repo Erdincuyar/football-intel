@@ -141,9 +141,9 @@ def main() -> None:
 
     pd.set_option("display.width", 200)
     cols = ["title", "target", "expected_sign", "n_fired_disc", "diff_disc", "q",
-            "n_fired_conf", "diff_conf", "p_conf_dir", "kept"]
+            "n_fired_conf", "diff_conf", "p_conf_dir", "kept", "reversed"]
     text = "\n\n".join([
-        "Kurallar (fark = ateslenen - ateslenmeyen ortalama artik):\n"
+        "Kurallar (takim kosulu tutan satirlarda: rakip kosulu var - yok, ortalama artik farki):\n"
         + res[cols].round(3).to_string(index=False),
         f"Stil gruplari: k={info['k']}, siluet="
         + ", ".join(f"k={k}: {v:.3f}" for k, v in info["silhouette"].items()),

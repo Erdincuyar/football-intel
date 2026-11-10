@@ -93,3 +93,17 @@ def test_pair_rows_mirror_profiles():
     rows = ST.pair_rows(prof, "A", "B")
     assert rows.loc[0, "pre_fouls"] == 1 and rows.loc[0, "opp_pre_fouls"] == 2
     assert rows.loc[1, "team"] == "B" and rows.loc[1, "opp_pre_fouls"] == 1
+
+
+def test_team_flag_bias_does_not_fire_rule():
+    # "Takim kosulu" satirlari ortalamaya donus yuzunden negatif artikli; rakip etkisi yok.
+    rng = np.random.default_rng(4)
+    n = 4000
+    hi = rng.random(n) < 0.25
+    opp_lo = rng.random(n) < 0.25
+    d = pd.DataFrame({"match_id": np.arange(n) // 2, "season": "2223",
+                      "corner_share_high": hi, "opp_corner_share_low": opp_lo,
+                      "opp_corner_share_high": ~opp_lo,
+                      "res_corners": rng.normal(0, 2, n) - 1.0 * hi})
+    r = R.test_rule(d, R.RULES[0], n_boot=500)
+    assert r["lo"] < 0 < r["hi"]                 # eski "geri kalan herkes" kiyasi -1 bulurdu

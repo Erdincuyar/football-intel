@@ -79,6 +79,8 @@ for rule in R.RULES:
         if res is not None and bool(res["kept"]):
             status = (f"Gecerli: kesifte {res['diff_disc']:+.2f}, dogrulamada "
                       f"{res['diff_conf']:+.2f} {TARGET_TR[rule.target]}/mac")
+        elif res is not None and bool(res.get("reversed", False)):
+            status = "Ters yonde tekrar etti: kural yanlis yazilmis, yalnizca bilgi"
         elif res is not None:
             status = "Geriye donuk testte tutmadi: yalnizca bilgi"
         else:
@@ -99,7 +101,8 @@ else:
 if not results.empty:
     with st.expander("Tum kurallarin geriye donuk test sonucu"):
         t = results[["title", "target", "n_fired_disc", "diff_disc", "q", "n_fired_conf",
-                     "diff_conf", "p_conf_dir", "kept"]].copy()
+                     "diff_conf", "p_conf_dir", "kept"]
+                    + (["reversed"] if "reversed" in results else [])].copy()
         t["target"] = t["target"].map(TARGET_TR)
         st.dataframe(t.round(3), hide_index=True, width="stretch")
         st.caption("fark = kural ateslendiginde ortalama artik - ateslenmediginde ortalama "
