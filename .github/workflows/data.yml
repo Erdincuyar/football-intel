@@ -101,6 +101,9 @@ jobs:
       - name: "Faz 6: taktik metrikler ve stil profili"
         run: uv run python pipelines/build_tactics.py
 
+      - name: "Faz 7: stil gruplari ve eslesme kurallarinin testi"
+        run: uv run python pipelines/build_matchup.py
+
       - name: EDA ozeti
         run: uv run python pipelines/eda_report.py
 

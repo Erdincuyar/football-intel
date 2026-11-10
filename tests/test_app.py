@@ -63,13 +63,29 @@ def data_dir(tmp_path, monkeypatch):
                            home_shots_on_target=4, away_shots_on_target=3, home_fouls=11,
                            away_fouls=13, season="2627")
     A.style_profile(sides, [proxy], min_matches=1).to_parquet(clean / "style_profile.parquet")
+    # Faz 7: eslesme sayfasi
+    from footintel.analysis import rules as R
+    from footintel.features import style as ST
+    cols = [f"pre_{c}" for c in ST.PROFILE_COLS]
+    pd.DataFrame({"league": "E0", "team": ["A", "B"], "n_prev": [10, 6],
+                  **{c: [0.6, 0.4] for c in cols}}).to_parquet(clean / "style_now.parquet")
+    th = pd.DataFrame({c: [0.45, 0.55] for c in cols}, index=[0.25, 0.75])
+    (clean / "style_thresholds.json").write_text(
+        json.dumps({"E0": th.reset_index().to_dict("records")}))
+    (clean / "matchup_rules.json").write_text(json.dumps([
+        {"rule": r.key, "title": r.title, "target": r.target, "n_fired_disc": 50,
+         "diff_disc": 0.3, "q": 0.01, "n_fired_conf": 40, "diff_conf": 0.2,
+         "p_conf_dir": 0.02, "kept": i == 0} for i, r in enumerate(R.RULES)]))
+    (clean / "style_clusters.json").write_text(json.dumps({
+        "k": 2, "labels": ["+sut payi", "-sut payi"],
+        "centers": [[1.0] * len(ST.CLUSTER_FEATURES), [-1.0] * len(ST.CLUSTER_FEATURES)]}))
     monkeypatch.setattr(cfg, "CLEAN_DIR", clean)
     monkeypatch.setattr(cfg, "LEDGER_DIR", led_dir)
     return tmp_path
 
 
 @pytest.mark.parametrize("page", ["Home.py", "pages/1_Model_Performance.py",
-                                  "pages/2_Taktik_Profil.py"])
+                                  "pages/2_Taktik_Profil.py", "pages/3_Eslesme.py"])
 def test_page_runs(data_dir, page):
     at = AppTest.from_file(str(APP / page), default_timeout=60).run()
     assert not at.exception, at.exception

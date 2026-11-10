@@ -87,6 +87,25 @@ katmanlı bir yol izliyoruz:
 Arayüzde **Taktik Profil** sayfası. Veri: [StatsBomb Open Data](https://github.com/statsbomb/open-data)
 (kaynak gösterilerek, ticari olmayan kullanım).
 
+## Taktiksel eşleşme (Faz 7)
+
+Kurallar veriye bakılmadan önce yazıldı (`src/footintel/analysis/rules.py`). Her kural,
+bir takımın gücünü rakibin ilgili zayıflığıyla eşleştiriyor. Örnek: "çok korner kazanan
+takım, korner veren rakibe karşı modelin beklediğinden fazla korner kazanır."
+
+- **Profil:** Her takımın o maçtan önceki son 10 maçı (football-data). "Yüksek" ve "düşük"
+  eşikleri aynı ligin önceki sezonlarından gelir, böylece sızıntı olmaz.
+- **Test:** Kural, modelin artığına karşı test edilir (gerçekleşen eksi Dixon-Coles veya
+  korner modeli). Modelin zaten bildiğini kural diye saymamak için bu gerekli.
+- **Kapı:** Bir kural iki şartla tutulur: 2022-24 keşif döneminde Benjamini-Hochberg
+  düzeltmesinden sonra anlamlı olmalı, 2024-26 doğrulama döneminde de aynı yönde
+  tekrarlamalı.
+- **Stil grupları:** Takım-sezon profillerine K-Means uygulanır. Gruplar StatsBomb
+  2015/16 metrikleriyle yorumlanır.
+
+Arayüzde **Eşleşme** sayfası. Sonuçlar `pipelines/build_matchup.py` çıktısında ve CI
+özetinde.
+
 ## Keşifsel analiz (EDA)
 
 `notebooks/01_eda.ipynb` gol, korner, ev avantajı ve bahis piyasası analizini içerir.

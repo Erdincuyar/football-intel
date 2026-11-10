@@ -124,9 +124,15 @@ def football_data_sides(fd: pd.DataFrame) -> pd.DataFrame:
         t = pd.DataFrame({"match_id": fd["match_id"], "league": fd["league"],
                           "season": fd["season"], "match_date": fd["match_date"],
                           "team": fd[f"{side}_team"], "is_home": home})
-        for src, dst in cols.items():
-            t[dst] = fd[f"{side}_{src}"]
-            t[f"{dst}_against"] = fd[f"{opp}_{src}"]
+        if f"{side}_team_id" in fd:
+            t["team_id"] = fd[f"{side}_team_id"].to_numpy()
+            t["opp_id"] = fd[f"{opp}_team_id"].to_numpy()
+        for src, dst in {**cols, "yellow": "yellows"}.items():
+            if f"{side}_{src}" not in fd:
+                continue
+            t[dst] = pd.to_numeric(fd[f"{side}_{src}"], errors="coerce").to_numpy(float)
+            t[f"{dst}_against"] = pd.to_numeric(fd[f"{opp}_{src}"],
+                                                errors="coerce").to_numpy(float)
         out.append(t)
     t = pd.concat(out, ignore_index=True)
     t["points"] = np.select([t["goals"] > t["goals_against"],
