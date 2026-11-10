@@ -81,7 +81,8 @@ katmanlı bir yol izliyoruz:
 | --- | --- |
 | Hangi metrik kalıcı bir stil? | Pas isabeti, uzun pas oranı, pas payı (sezon güvenilirliği ≥ 0.95). Korner payı en gürültülü (0.60). |
 | İlk yarı, ikinci yarı puanını ne kadar açıklar? (R²) | xG payı 0.45 > gol farkı 0.42 > şut payı 0.38 ≈ isabetli şut payı 0.37 > korner payı 0.28 |
-| Basit sayılardan tahmin edilebilir mi? (dış lig R²) | xT payı 0.87, xG payı 0.87, field tilt 0.78, pas payı 0.63. **PPDA 0.04: pres yoğunluğu şut/korner/faul sayılarından çıkmıyor.** |
+| Basit sayılardan tahmin edilebilir mi? (şut, isabetli şut ve korner payından; dış lig R²) | xG payı 0.88, xT payı 0.87, field tilt 0.77 kullanılıyor. Pas payı 0.58 ile eşiğin altında. **PPDA 0.10: pres yoğunluğu bu sayılardan çıkmıyor.** |
+| İki kaynak aynı şeyi mi sayıyor? (2015/16, maç başı) | Şut, isabetli şut ve korner %1-3 farkla aynı. Faulde StatsBomb %8-17 fazla sayıyor, bu yüzden faul proxy'ye girmiyor. |
 
 Arayüzde **Taktik Profil** sayfası. Veri: [StatsBomb Open Data](https://github.com/statsbomb/open-data)
 (kaynak gösterilerek, ticari olmayan kullanım).

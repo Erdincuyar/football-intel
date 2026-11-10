@@ -108,7 +108,10 @@ def team_season(tm: pd.DataFrame, metrics: list[str]) -> pd.DataFrame:
 
 # --- football-data.co.uk'tan guncel stil profili --------------------------------------
 
-PROXY_FEATURES = ["shot_share", "sot_share", "corner_share", "fouls", "fouls_against"]
+# Faul sayilari bilerek disarida: 2015/16 tanim kontrolunde StatsBomb, football-data'dan
+# %8-17 fazla faul sayiyor (sut, isabetli sut ve kornerde fark %1-3). Faul ile egitilen bir
+# model football-data'ya tasininca sistematik olarak kayardi. Paylar ise iki kaynakta ayni.
+PROXY_FEATURES = ["shot_share", "sot_share", "corner_share"]
 PROXY_TARGETS = ["xg_share", "xt_share", "field_tilt", "pass_share"]
 
 
