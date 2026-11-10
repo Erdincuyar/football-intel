@@ -102,3 +102,32 @@ def test_wrong_ht_goals_keep_full_time_score():
     df = clean_matches(raw, "E0", "2526")
     assert pd.isna(df.loc[0, "home_goals_ht"])
     assert df.loc[0, "home_goals"] == 2
+
+
+def test_get_retries_transient_errors(monkeypatch):
+    import requests
+
+    from footintel.ingest import football_data as F
+
+    calls = []
+
+    class Resp:
+        status_code = 200
+
+    def fake_get(url, **kw):
+        calls.append(url)
+        if len(calls) < 3:
+            raise requests.exceptions.ReadTimeout("handshake timed out")
+        return Resp()
+
+    monkeypatch.setattr(F.requests, "get", fake_get)
+    monkeypatch.setattr(F.time, "sleep", lambda s: None)
+    assert F._get("https://x").status_code == 200
+    assert len(calls) == 3
+
+    calls.clear()
+    monkeypatch.setattr(F.requests, "get", lambda url, **kw: (_ for _ in ()).throw(
+        requests.exceptions.ConnectTimeout("down")))
+    import pytest
+    with pytest.raises(requests.exceptions.ConnectTimeout):
+        F._get("https://x", attempts=2)
