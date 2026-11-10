@@ -38,6 +38,31 @@ def raw_path(league: str, season: str) -> Path:
     return RAW_SUBDIR / f"{league}_{season}.csv"
 
 
+def _get(url: str, attempts: int = 4, backoff: float = 5.0) -> requests.Response:
+    """GET + gecici hatalarda tekrar deneme (zaman asimi, baglanti kopmasi, 5xx).
+
+    8 Kasim'daki zamanlanmis calisma, sitenin TLS el sikismasi zaman asimina ugradigi
+    icin tamamen dustu. Gecici ag hatalari icin 5, 10, 20 sn bekleyip yeniden deneriz;
+    404 gibi kalici hatalar tekrar denenmez.
+    """
+    for i in range(attempts):
+        try:
+            response = requests.get(url, headers=HEADERS, timeout=30)
+            if response.status_code < 500:
+                return response
+            err: Exception = requests.HTTPError(f"HTTP {response.status_code}")
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+            if isinstance(exc, requests.exceptions.SSLError):
+                raise
+            err = exc
+        if i == attempts - 1:
+            raise err
+        wait = backoff * 2 ** i
+        log.warning("%s gecici hata (%s); %.0f sn sonra tekrar", url, err, wait)
+        time.sleep(wait)
+    raise AssertionError("ulasilamaz")
+
+
 def download_season(league: str, season: str, *, force: bool = False) -> Path | None:
     """Bir lig-sezon dosyasini indirir ve yolunu dondurur.
 
@@ -52,7 +77,7 @@ def download_season(league: str, season: str, *, force: bool = False) -> Path | 
 
     url = BASE_URL.format(season=season, league=league)
     try:
-        response = requests.get(url, headers=HEADERS, timeout=30)
+        response = _get(url)
     except requests.exceptions.SSLError as exc:
         raise RuntimeError(
             f"{url} icin SSL sertifikasi dogrulanamadi. Aginizda HTTPS trafigini "
@@ -92,7 +117,7 @@ def download_fixtures(run_date: str) -> Path:
     Site bu dosyayi hafta icinde gunceller. Her calistirmanin kopyasini tarihle
     sakliyoruz: hangi tahminin hangi fikstur listesiyle yapildigi izlenebilsin.
     """
-    response = requests.get(FIXTURES_URL, headers=HEADERS, timeout=30)
+    response = _get(FIXTURES_URL)
     response.raise_for_status()
     path = RAW_SUBDIR / f"fixtures_{run_date}.csv"
     path.parent.mkdir(parents=True, exist_ok=True)
