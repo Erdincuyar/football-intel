@@ -43,12 +43,33 @@ def data_dir(tmp_path, monkeypatch):
                   "p_home": 0.45, "p_draw": 0.27, "p_away": 0.28, "p_over25": 0.52,
                   "p_btts": 0.5, "p_corners_over95": 0.48, "ll_score": -2.9,
                   "ll_corners": -2.6}).to_parquet(clean / "backtest_predictions.parquet")
+    # Faz 6: taktik sayfasi icin kucuk sentetik ciktilar
+    import json
+
+    from footintel.analysis import tactics as A
+    from footintel.features import tactics as T
+    from tests.test_tactics import MATCHES, synthetic_match
+    T.team_match_metrics(synthetic_match(), MATCHES, np.full((16, 12), 0.01)).to_parquet(
+        clean / "tactics_team_match_1516.parquet")
+    (clean / "xt_grid.json").write_text(json.dumps([[0.01, 0.02], [0.05, 0.2]]))
+    proxy = {"target": "field_tilt", "features": ["shot_share"], "beta": [0.0, 1.0],
+             "r2_leave_league_out": 0.8, "rmse_leave_league_out": 0.03, "target_sd": 0.07}
+    (clean / "tactics_proxy.json").write_text(json.dumps([proxy]))
+    (clean / "tactics_summary.json").write_text(json.dumps({
+        "reliability": [{"metric": "ppda", "split_half_r": 0.7, "season_reliability": 0.8}],
+        "predictive": [{"metric": "xg_share", "r": 0.6, "r2": 0.36}]}))
+    sides = matches.assign(match_date=pd.Timestamp("2026-08-01").date(), home_team="A",
+                           away_team="B", home_shots=12, away_shots=8,
+                           home_shots_on_target=4, away_shots_on_target=3, home_fouls=11,
+                           away_fouls=13, season="2627")
+    A.style_profile(sides, [proxy], min_matches=1).to_parquet(clean / "style_profile.parquet")
     monkeypatch.setattr(cfg, "CLEAN_DIR", clean)
     monkeypatch.setattr(cfg, "LEDGER_DIR", led_dir)
     return tmp_path
 
 
-@pytest.mark.parametrize("page", ["Home.py", "pages/1_Model_Performance.py"])
+@pytest.mark.parametrize("page", ["Home.py", "pages/1_Model_Performance.py",
+                                  "pages/2_Taktik_Profil.py"])
 def test_page_runs(data_dir, page):
     at = AppTest.from_file(str(APP / page), default_timeout=60).run()
     assert not at.exception, at.exception

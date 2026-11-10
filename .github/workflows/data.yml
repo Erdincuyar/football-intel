@@ -90,6 +90,17 @@ jobs:
           git commit -m "Tahmin defteri: $(date -u +%F)"
           git push
 
+      - name: StatsBomb onbellegi
+        # 2015/16 olay verisi degismez; her calismada ~4.6 GB yeniden indirmemek icin
+        # ince Parquet ciktisini onbellekte tutuyoruz (anahtari degistirmek yeniden indirir).
+        uses: actions/cache@v4
+        with:
+          path: data/raw/statsbomb
+          key: statsbomb-1516-v1
+
+      - name: "Faz 6: taktik metrikler ve stil profili"
+        run: uv run python pipelines/build_tactics.py
+
       - name: EDA ozeti
         run: uv run python pipelines/eda_report.py
 
