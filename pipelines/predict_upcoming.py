@@ -24,7 +24,7 @@ import pandas as pd
 
 from footintel import ledger
 from footintel.analysis.eda import played
-from footintel.clean.fixtures import parse_fixtures
+from footintel.clean.fixtures import kickoff_utc, parse_fixtures
 from footintel.clean.football_data import read_raw_csv
 from footintel.config import CLEAN_DIR, CURRENT_SEASON, LEAGUES, LEDGER_DIR
 from footintel.ingest import football_data as fd_ingest
@@ -78,6 +78,7 @@ def main() -> None:
     now = pd.Timestamp.now(tz="UTC").tz_localize(None)
     today = now.normalize()
     run_date = today.date().isoformat()
+    run_stamp = now.strftime("%Y-%m-%dT%H%M")   # gunde birden fazla calistirma olabilir
     if args.offline:
         path = max(fd_ingest.RAW_SUBDIR.glob("fixtures_*.csv"))
     else:
@@ -89,6 +90,11 @@ def main() -> None:
     fixtures = parse_fixtures(path)
     dates = pd.to_datetime(fixtures["match_date"])
     fixtures = fixtures[(dates >= today) & (dates <= today + pd.Timedelta(days=HORIZON_DAYS))]
+    # Bugun baslamis (ya da bitmis) maclar artik "mac oncesi" degildir.
+    kick = pd.Series([kickoff_utc(d, t) for d, t in
+                      fixtures[["match_date", "kickoff_time"]].itertuples(index=False)],
+                     index=fixtures.index, dtype="datetime64[ns]")
+    fixtures = fixtures[kick.isna() | (kick > now)]
     done = ledger.already_predicted(LEDGER_DIR, MODEL_VERSION)
     new = fixtures[~fixtures["match_key"].isin(done)]
     log.info("Fikstur: %d mac, %d tanesi zaten defterde, %d yeni",
@@ -113,7 +119,7 @@ def main() -> None:
 
     written = None
     if not args.dry_run:
-        written = ledger.append(LEDGER_DIR, rows, run_date, MODEL_VERSION)
+        written = ledger.append(LEDGER_DIR, rows, run_stamp, MODEL_VERSION)
         log.info("Deftere yazildi: %s (%d satir)", written, len(rows))
 
     summary = os.environ.get("GITHUB_STEP_SUMMARY")

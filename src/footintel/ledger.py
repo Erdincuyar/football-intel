@@ -2,8 +2,8 @@
 
 Kurallar:
 1. Tahmin MACTAN ONCE yazilir ve bir daha degistirilmez. Her calistirma yeni bir
-   Parquet dosyasi ekler (data/predictions/YYYY-MM-DD_<surum>.parquet); var olan
-   dosyanin uzerine yazmak hata verir.
+   Parquet dosyasi ekler (data/predictions/YYYY-MM-DDTHHMM_<surum>.parquet); var olan
+   dosyanin uzerine yazmak hata verir. Baslama saati gecmis maca tahmin yazilamaz.
 2. Bir mac, ayni model surumuyle yalnizca bir kez tahmin edilir (ilk tahmin gecerlidir).
    Boylece "kotu giden tahmini sonradan duzeltmek" mumkun olmaz.
 3. Dosyalar GitHub Actions tarafindan git'e commit'lenir. Commit zamani mac saatinden
@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from footintel.clean.fixtures import match_key
+from footintel.clean.fixtures import kickoff_utc, match_key
 
 LEDGER_COLUMNS = [
     "prediction_id", "match_key", "league", "season", "match_date", "kickoff_time",
@@ -140,7 +140,11 @@ def already_predicted(ledger_dir: Path, version: str) -> set[str]:
 
 
 def append(ledger_dir: Path, rows: pd.DataFrame, run_date: str, version: str) -> Path | None:
-    """Yeni bir defter dosyasi yazar. Var olan dosyaya ve var olan tahmine dokunmaz."""
+    """Yeni bir defter dosyasi yazar. Var olan dosyaya ve var olan tahmine dokunmaz.
+
+    run_date: dosya adinin zaman damgasi (or. 2026-11-06T1500); gunde birden fazla
+    calistirma olabildigi icin saat de icerir.
+    """
     if rows.empty:
         return None
     dup = set(rows["match_key"]) & already_predicted(ledger_dir, version)
@@ -149,8 +153,12 @@ def append(ledger_dir: Path, rows: pd.DataFrame, run_date: str, version: str) ->
     path = ledger_dir / f"{run_date}_{version}.parquet"
     if path.exists():
         raise LedgerError(f"{path.name} zaten var; defter dosyalarinin uzerine yazilmaz.")
-    late = rows[pd.to_datetime(rows["match_date"]) < pd.Timestamp(rows["created_at"].iloc[0]
-                                                                  ).normalize()]
+    created = pd.Timestamp(rows["created_at"].iloc[0])
+    kick = pd.Series([kickoff_utc(d, t) for d, t in
+                      rows[["match_date", "kickoff_time"]].itertuples(index=False)],
+                     index=rows.index, dtype="datetime64[ns]")
+    day_passed = pd.to_datetime(rows["match_date"]) < created.normalize()
+    late = rows[day_passed | (kick.notna() & (kick <= created))]
     if len(late):
         raise LedgerError(f"Oynanmis maclar icin tahmin yazilamaz: {late['match_key'].unique()}")
     ledger_dir.mkdir(parents=True, exist_ok=True)

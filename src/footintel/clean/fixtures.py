@@ -21,6 +21,18 @@ def match_key(league: str, season: str, home_id: str, away_id: str) -> str:
     return f"{league}-{season}-{home_id}-{away_id}"
 
 
+def kickoff_utc(match_date, kickoff_time) -> pd.Timestamp:
+    """Baslama anini UTC olarak verir (saat yoksa NaT).
+
+    football-data.co.uk saatleri Birlesik Krallik saatiyle (Europe/London) yazar; yaz/kis
+    saati farkini elle hesaplamak yerine saat dilimi veritabanina birakiyoruz.
+    """
+    if kickoff_time is None or pd.isna(kickoff_time) or not str(kickoff_time).strip():
+        return pd.NaT
+    local = pd.Timestamp(f"{pd.Timestamp(match_date).date()} {str(kickoff_time).strip()}")
+    return local.tz_localize("Europe/London").tz_convert("UTC").tz_localize(None)
+
+
 def parse_fixtures(path: Path, season: str = CURRENT_SEASON) -> pd.DataFrame:
     raw = read_raw_csv(path)
     raw = raw[raw["Div"].isin(LEAGUES)]

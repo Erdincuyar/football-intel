@@ -78,6 +78,27 @@ def test_append_rejects_past_matches(tmp_path, fixtures):
         ledger.append(tmp_path, rows, "2026-11-09", "v-test")
 
 
+def test_kickoff_utc_handles_british_summer_time():
+    from footintel.clean.fixtures import kickoff_utc
+    # Kasim: kis saati (GMT = UTC); Agustos: yaz saati (BST = UTC+1)
+    assert kickoff_utc("2026-11-07", "15:00") == pd.Timestamp("2026-11-07 15:00")
+    assert kickoff_utc("2026-08-15", "15:00") == pd.Timestamp("2026-08-15 14:00")
+    assert pd.isna(kickoff_utc("2026-11-07", None))
+
+
+def test_append_rejects_started_match_same_day(tmp_path, fixtures):
+    # E0 maci 7 Kasim 15:00'te basliyor; ayni gun 15:30'da tahmin yazilamaz.
+    e0 = fixtures[fixtures["league"] == "E0"]
+    rows = ledger.build(e0, fake_predictions(e0), "v-test",
+                        pd.Timestamp("2026-11-07 15:30"), "abc")
+    with pytest.raises(ledger.LedgerError, match="Oynanmis"):
+        ledger.append(tmp_path, rows, "2026-11-07T1530", "v-test")
+    # Ayni gun, baslamadan once (12:00) yazilabilir
+    rows = ledger.build(e0, fake_predictions(e0), "v-test",
+                        pd.Timestamp("2026-11-07 12:00"), "abc")
+    assert ledger.append(tmp_path, rows, "2026-11-07T1200", "v-test").exists()
+
+
 def test_evaluate_outcomes(fixtures):
     rows = ledger.build(fixtures, fake_predictions(fixtures), "v-test", NOW, "abc")
     results = pd.DataFrame({
