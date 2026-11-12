@@ -38,7 +38,10 @@ BOOL_OID = 16                     # Postgres boolean tip kimligi
 
 # Uygulamanin okudugu tablolar (data/clean/<ad>.parquet) ve JSON ciktilari.
 APP_TABLES = ["matches_football_data", "backtest_predictions", "style_profile",
-              "tactics_team_match_1516", "style_now"]
+              "tactics_team_match_1516", "style_now",
+              # Faz 9 turetilmis tablolar (her calismada bastan uretilir; tahminler degil)
+              "match_results", "prediction_evaluation", "evaluation_summary",
+              "evaluation_metrics"]
 APP_JSON = ["tactics_proxy", "tactics_summary", "xt_grid", "matchup_rules",
             "style_thresholds", "style_clusters"]
 
@@ -269,3 +272,4 @@ def published_at(url: str | None = None) -> str | None:
             return row[0] if row else None
     except Exception:
         return None
+
