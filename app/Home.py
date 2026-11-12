@@ -47,7 +47,9 @@ upcoming = upcoming[upcoming["league"].isin([leagues[c] for c in choice])]
 
 wanted = {("1x2", "home"): "1", ("1x2", "draw"): "X", ("1x2", "away"): "2",
           ("ou25", "over"): "2.5 Ust", ("btts", "yes"): "KG Var",
-          ("corners_ou95", "over"): "Korner 9.5 Ust"}
+          ("home_corners_ou45", "over"): "Ev korner 4.5 Ust",
+          ("away_corners_ou45", "over"): "Dep korner 4.5 Ust",
+          ("corners_ou95", "over"): "Toplam korner 9.5 Ust*"}
 keep = pd.Series([(m, s) in wanted for m, s in zip(upcoming["market"], upcoming["selection"],
                                                     strict=True)], index=upcoming.index,
                  dtype=bool)
@@ -69,3 +71,5 @@ st.dataframe(
 )
 version = led["model_version"].iloc[-1]
 st.caption(f"Model surumu: {version}. Olasiliklar mac oncesi kaydedildi; sonradan degistirilmez.")
+st.caption("* Dusuk guven: toplam korner modeli backtest'te lig ortalamasindan anlamli olarak "
+           "iyi degil (Faz 5). Takim bazli korner tahminleri anlamli olarak daha iyi.")
