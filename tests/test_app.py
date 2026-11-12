@@ -89,3 +89,21 @@ def data_dir(tmp_path, monkeypatch):
 def test_page_runs(data_dir, page):
     at = AppTest.from_file(str(APP / page), default_timeout=60).run()
     assert not at.exception, at.exception
+
+
+def test_home_without_upcoming_matches(data_dir, monkeypatch):
+    # Defterde yalnizca gecmis maclar varken (milli mac arasi) ana sayfa cokmemeli.
+    led_dir = data_dir / "past_predictions"
+    fx = parse_fixtures(FIX, season="2627")
+    fx["match_date"] = (pd.Timestamp.today().normalize() - pd.Timedelta(days=5)).date()
+    rows = ledger.build(fx, fake_predictions(fx), "v-test", pd.Timestamp.today(), "abc")
+    led_dir.mkdir()
+    # ledger.append gecmis maclari (dogru olarak) reddeder; burada maclar yazildiktan sonra
+    # oynanmis gibi davranmak icin dosyayi dogrudan yaziyoruz.
+    rows.to_parquet(led_dir / "2099-01-01_v-test.parquet", index=False)
+    monkeypatch.setattr(cfg, "LEDGER_DIR", led_dir)
+    import streamlit as st
+    st.cache_data.clear()                  # onceki testin defteri onbellekte kalmasin
+    at = AppTest.from_file(str(APP / "Home.py"), default_timeout=60).run()
+    assert not at.exception, at.exception
+    assert any("yaklasan mac yok" in i.value for i in at.info)
