@@ -34,6 +34,7 @@ LEAGUES: dict[str, League] = {
     "T1": League("T1", "Super Lig", "Turkey"),
     "I1": League("I1", "Serie A", "Italy"),
     "F1": League("F1", "Ligue 1", "France"),
+    "D1": League("D1", "Bundesliga", "Germany"),
 }
 
 # Sezon kodu football-data.co.uk formatinda: "2526" = 2025/26.
@@ -59,6 +60,7 @@ UNDERSTAT_LEAGUES: dict[str, str] = {
     "SP1": "La_liga",
     "I1": "Serie_A",
     "F1": "Ligue_1",
+    "D1": "Bundesliga",
 }
 
 # ClubElo ulke kodlari. ClubElo'da Level=1 en ust lig demektir.
@@ -68,4 +70,5 @@ CLUBELO_COUNTRIES: dict[str, str] = {
     "T1": "TUR",
     "I1": "ITA",
     "F1": "FRA",
+    "D1": "GER",
 }

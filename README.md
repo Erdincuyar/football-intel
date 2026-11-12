@@ -70,7 +70,7 @@ katmanlı bir yol izliyoruz:
    PPDA, savunma yüksekliği, ileri pres oranı, field tilt, xG/xT payı, uzun pas ve orta
    oranı (`src/footintel/features/tactics.py`). xT (expected threat) ızgarası aynı veriden
    fit edilir.
-2. **Güncel sezon stil profili** (5 lig, Süper Lig dahil): football-data'nın şut, isabetli
+2. **Güncel sezon stil profili** (6 lig, Süper Lig dahil): football-data'nın şut, isabetli
    şut, korner ve faul sayılarından. Zengin metriklerin bir kısmı bu sayılardan doğrusal bir
    modelle tahmin edilir. Model StatsBomb verisinde, her seferinde bir lig dışarıda
    bırakılarak test edilir ve yalnızca dış ligde R² ≥ 0.6 olan metrikler kullanılır.
@@ -116,7 +116,7 @@ aynen çalışır (`src/footintel/store.py`).
 
 | Tablo (`app.` şeması) | İçerik |
 |---|---|
-| `matches_football_data` | 5 lig, maç sonuçları, istatistikler, oranlar |
+| `matches_football_data` | 6 lig (Bundesliga dahil), maç sonuçları, istatistikler, oranlar |
 | `backtest_predictions` | walk-forward tahminleri (Model Performansı) |
 | `predictions` | tahmin defteri (repodaki `data/predictions/` ile aynı) |
 | `style_profile`, `style_now` | güncel stil profilleri (Taktik Profil, Eşleşme) |
