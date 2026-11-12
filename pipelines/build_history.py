@@ -37,8 +37,10 @@ def main() -> None:
     bt = pd.read_parquet(CLEAN_DIR / "backtest_predictions.parquet")
     cards_path = CLEAN_DIR / "cards_backtest.parquet"
     cards = pd.read_parquet(cards_path) if cards_path.exists() else None
+    ht_path = CLEAN_DIR / "halftime_backtest.parquet"
+    halftime = pd.read_parquet(ht_path) if ht_path.exists() else None
     fd = fd[fd["season"].isin(SEASONS)]
-    hist = H.assemble(fd, bt, cards, pd.Timestamp.now(tz="UTC"))
+    hist = H.assemble(fd, bt, cards, pd.Timestamp.now(tz="UTC"), halftime=halftime)
     hist.to_parquet(CLEAN_DIR / "historical_predictions.parquet", index=False)
     log.info("Gecmis tahmin: %d mac (%s)", len(hist),
              hist.groupby(["league", "season"]).size().to_dict())

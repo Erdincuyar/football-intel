@@ -48,6 +48,11 @@ def badge(team: str) -> tuple[str, str]:
     return abbr, f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
 
 
+def _ht_p(m: pd.Series):
+    key = {"H": "p_ht_home", "D": "p_ht_draw", "A": "p_ht_away"}.get(m.get("pred_ht_result"))
+    return m.get(key) if key else np.nan
+
+
 def card_rows(m: pd.Series) -> list[dict]:
     """Bir macin tahmin/gercek/isaret satirlari. m: tahmin + (varsa) degerlendirme kolonlari.
 
@@ -71,6 +76,11 @@ def card_rows(m: pd.Series) -> list[dict]:
          "pred": f"{RESULT_TR.get(g('pred_result'), NA)} ({_pct(p_res)})",
          "actual": "—" if not played else RESULT_TR.get(g("result_actual"), NA),
          "mark": _mark(g("result_ok")), "mark_pm1": "skip"},
+        {"label": "Ilk yari sonucu",
+         "pred": NA if _isna(g("pred_ht_result")) else
+         f"{RESULT_TR.get(g('pred_ht_result'), NA)} ({_pct(_ht_p(m))})",
+         "actual": "—" if not played else RESULT_TR.get(g("ht_result_actual"), NA),
+         "mark": _mark(g("ht_result_ok")), "mark_pm1": "skip"},
         {"label": "Skor",
          "pred": f"{g('pred_score') or NA} ({_pct(g('p_pred_score'))})",
          "actual": "—" if not played else (g("score_actual") or NA),
@@ -104,7 +114,7 @@ def card_rows(m: pd.Series) -> list[dict]:
                  "actual": actual_yn(g("red_actual"), "Var", "Yok"),
                  "mark": _mark(g("red_ok")), "mark_pm1": "skip"})
     rows.append({"label": "Ilk golu atan", "pred": NA, "actual": NA, "mark": None,
-                 "mark_pm1": "skip"})
+                 "mark_pm1": "skip"})          # gol dakikasi verisi yok
     return rows
 
 

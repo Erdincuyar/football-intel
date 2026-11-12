@@ -50,7 +50,7 @@ def test_assemble_has_no_result_columns_and_picks_argmax():
     bt = B.walk_forward(fd, "E0", ["2526"], CFG, CCFG)
     h = H.assemble(fd[fd["season"] == "2526"], bt, None, pd.Timestamp("2026-11-12"))
     assert len(h) == 30 and h["matchweek"].between(1, 10).all()
-    allowed = H.PRED_COLS + H.CARD_COLS + ["exp_total_goals", "pred_result"]
+    allowed = H.PRED_COLS + H.CARD_COLS + H.HT_COLS + ["exp_total_goals", "pred_result"]
     leaked = [c for c in h if c not in allowed and any(w in c for w in H.RESULT_WORDS)]
     assert leaked == []
     best = h[["p_home", "p_draw", "p_away"]].to_numpy().argmax(axis=1)
@@ -70,3 +70,10 @@ def test_append_immutable_never_overwrites():
     assert store.append_immutable(TEST_URL, "hist_test", more, ["match_id", "model_version"]) == 1
     back = store.read_table("hist_test", url=TEST_URL).set_index("match_id")["p_home"]
     assert back.to_dict() == {"m1": 0.5, "m2": 0.4, "m3": 0.3}  # eski tahminler korundu
+    # Yeni surum yeni kolon getirirse eski satirlar degismez, yeni kolon eskilerde NULL
+    v2 = pd.DataFrame({"match_id": ["m1"], "model_version": "v2", "p_home": [0.6],
+                       "p_ht_home": [0.3]})
+    assert store.append_immutable(TEST_URL, "hist_test", v2, ["match_id", "model_version"]) == 1
+    back = store.read_table("hist_test", url=TEST_URL)
+    old = back[back["model_version"] == "v1"]
+    assert old["p_home"].tolist() == [0.5, 0.4, 0.3] and old["p_ht_home"].isna().all()

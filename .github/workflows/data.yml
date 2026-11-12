@@ -92,6 +92,9 @@ jobs:
       - name: "Faz 9: kart verisi kapsami ve kart modeli"
         run: uv run python pipelines/build_cards.py
 
+      - name: "Faz 9: ilk yari sonucu modeli"
+        run: uv run python pipelines/build_halftime.py
+
       - name: "Faz 9: gecmis maclar icin surumlu tahmin tablosu"
         env:
           FOOTINTEL_DATABASE_URL: ${{ github.event_name != 'pull_request' && secrets.FOOTINTEL_DATABASE_URL || '' }}

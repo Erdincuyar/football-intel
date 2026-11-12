@@ -6,6 +6,7 @@ Akis (uc ayri tablo, hicbiri digerini degistirmez):
 
 Dogru/yanlis kurallari (her biri bir "pazar"):
 - result: en yuksek olasilikli sonuc (1/X/2) gerceklesen mi?
+- ht_result: ayni kural, ilk yari skoru icin ("ilk golu atan" verisi yok; yerine bu).
 - score: en olasi skor birebir tuttu mu?
 - goals_total, corners_*, yellow_*: beklenen deger yuvarlanir (0.5 yukari). Iki isaret:
   tam isabet (ok) ve +-1 tolerans (ok_pm1). Ikisi ayri gosterilir; toleransli oran tek basina
@@ -14,7 +15,8 @@ Dogru/yanlis kurallari (her biri bir "pazar"):
 
 Kiyas cizgileri (baseline) olmadan bir yuzde anlamsizdir; "%52 dogru" iyi mi kotu mu?
 - result ve ou25: kapanis oranlarindan piyasa tahmini (en guclu rakip).
-- btts, red ve sayilar: ligin BIR ONCEKI sezon ortalamasi ("hicbir sey bilmeyen" tahminci).
+- ht_result, btts, red ve sayilar: ligin BIR ONCEKI sezon ortalamasi/frekansi
+  ("hicbir sey bilmeyen" tahminci).
   Onceki sezonu olmayan ligde baseline N/A olur (uydurulmaz).
 
 Eksik veri: tahmin veya sonuc yoksa isaret NA olur (pandas boolean). Ozetlerdeki n yalnizca
@@ -43,7 +45,7 @@ COUNT_MARKETS = {
     "yellow_total": ("exp_total_yellow", ("home_yellow", "away_yellow")),
 }
 BINARY_MARKETS = {"ou25": "p_over25", "btts": "p_btts", "red": "p_red_any"}
-MARKETS = ["result", "score", *BINARY_MARKETS, *COUNT_MARKETS]
+MARKETS = ["result", "ht_result", "score", *BINARY_MARKETS, *COUNT_MARKETS]
 EVAL_VERSION = "eval-v1"
 
 
@@ -69,11 +71,17 @@ def league_priors(fd: pd.DataFrame) -> pd.DataFrame:
     d["red_any"] = (reds > 0).astype(float).where(reds.notna())
     d["corners_total"] = d["home_corners"] + d["away_corners"]
     d["yellow_total"] = d["home_yellow"] + d["away_yellow"]
+    if "home_goals_ht" not in d:
+        d["home_goals_ht"] = d["away_goals_ht"] = np.nan
+    htd = d["home_goals_ht"] - d["away_goals_ht"]
+    for k, cond in (("ht_home", htd > 0), ("ht_draw", htd == 0), ("ht_away", htd < 0)):
+        d[k] = cond.astype(float).where(htd.notna())
     stats = {"total_goals": "base_goals_total", "btts": "base_p_btts",
              "red_any": "base_p_red", "home_corners": "base_corners_home",
              "away_corners": "base_corners_away", "corners_total": "base_corners_total",
              "home_yellow": "base_yellow_home", "away_yellow": "base_yellow_away",
-             "yellow_total": "base_yellow_total"}
+             "yellow_total": "base_yellow_total", "ht_home": "base_p_ht_home",
+             "ht_draw": "base_p_ht_draw", "ht_away": "base_p_ht_away"}
     per = d.groupby(["league", "season"])[list(stats)].mean().rename(columns=stats)
     per = per.reset_index().sort_values(["league", "season"]).reset_index(drop=True)
     # Sezon kodlari ("2425") sirali; her satira ayni ligin bir onceki sezonunu koy.
@@ -120,6 +128,26 @@ def evaluate_matches(preds: pd.DataFrame, results: pd.DataFrame,
     d["result_base_pred"] = pd.Series(fav, index=d.index).where(mk_ok)
     d["result_base_ok"] = _flag(d["result_base_pred"], d["result_actual"],
                                 d["result_base_pred"] == d["result_actual"])
+
+    # Ilk yari sonucu: model vs lig frekansinin en sik sonucu
+    for c in ("p_ht_home", "p_ht_draw", "p_ht_away", "pred_ht_result",
+              "home_goals_ht", "away_goals_ht"):
+        if c not in d:
+            d[c] = np.nan
+    htd = d["home_goals_ht"] - d["away_goals_ht"]
+    d["ht_result_pred"] = d["pred_ht_result"]
+    d["ht_result_actual"] = pd.Series(np.select([htd > 0, htd < 0], ["H", "A"], "D"),
+                                      index=d.index).where(htd.notna())
+    d["ht_result_ok"] = _flag(d["ht_result_pred"], d["ht_result_actual"],
+                              d["ht_result_pred"] == d["ht_result_actual"])
+    bcols = ["base_p_ht_home", "base_p_ht_draw", "base_p_ht_away"]
+    bp = d[bcols].to_numpy(float) if set(bcols) <= set(d) else np.full((len(d), 3), np.nan)
+    has_b = ~np.isnan(bp).any(axis=1)
+    d["ht_result_base_pred"] = pd.Series(
+        np.array(["H", "D", "A"])[np.nan_to_num(bp, nan=-1).argmax(axis=1)],
+        index=d.index).where(has_b)
+    d["ht_result_base_ok"] = _flag(d["ht_result_base_pred"], d["ht_result_actual"],
+                                   d["ht_result_base_pred"] == d["ht_result_actual"])
 
     # Skor: en olasi skor (baseline yok)
     actual_score = (d["home_goals"].astype("Int64").astype("string") + "-"
@@ -176,7 +204,9 @@ def evaluate_matches(preds: pd.DataFrame, results: pd.DataFrame,
     keep = ["match_id", "model_version", "created_at", "league", "season", "matchweek",
             "match_date", "home_team", "away_team", "home_goals", "away_goals",
             "p_home", "p_draw", "p_away", "mkt_p_home", "mkt_p_draw", "mkt_p_away",
-            "p_over25", "mkt_p_over25", "p_btts", "p_red_any"]
+            "p_over25", "mkt_p_over25", "p_btts", "p_red_any",
+            "p_ht_home", "p_ht_draw", "p_ht_away", "base_p_ht_home", "base_p_ht_draw",
+            "base_p_ht_away"]
     keep = [c for c in keep if c in d]
     market_cols = [c for c in d.columns
                    if any(c.startswith(f"{m}_") for m in MARKETS) and c not in keep]
@@ -251,6 +281,14 @@ def prob_metrics(ev: pd.DataFrame, by: list[str]) -> pd.DataFrame:
                 brier_1x2(pk[ok], y[ok]), "piyasa")
             add("logloss_1x2", ok.sum(), log_loss_1x2(pm[ok], y[ok]),
                 log_loss_1x2(pk[ok], y[ok]), "piyasa")
+        yh = np.column_stack([g["ht_result_actual"] == r for r in "HDA"]).astype(float)
+        ph = g[["p_ht_home", "p_ht_draw", "p_ht_away"]].to_numpy(float)
+        pb = g[["base_p_ht_home", "base_p_ht_draw", "base_p_ht_away"]].to_numpy(float)
+        ok = (~np.isnan(ph).any(axis=1) & ~np.isnan(pb).any(axis=1)
+              & g["ht_result_actual"].notna().to_numpy())
+        if ok.any():
+            add("brier_ht", ok.sum(), brier_1x2(ph[ok], yh[ok]), brier_1x2(pb[ok], yh[ok]),
+                "onceki sezon")
         for m, pcol, ref_name in (("ou25", "p_over25", "piyasa"),
                                   ("btts", "p_btts", "onceki sezon"),
                                   ("red", "p_red_any", "onceki sezon")):
