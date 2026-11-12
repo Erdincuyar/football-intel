@@ -89,6 +89,9 @@ jobs:
       - name: "Faz 5: korner regresyonu (ozellik secimi, test, kapi)"
         run: uv run python pipelines/build_corners.py
 
+      - name: "Faz 9: kart verisi kapsami ve kart modeli"
+        run: uv run python pipelines/build_cards.py
+
       - name: "Faz 4: yaklasan maclari tahmin et ve deftere yaz"
         # PR'larda deftere yazilmaz (--dry-run): defter yalnizca main'de buyur.
         run: >
