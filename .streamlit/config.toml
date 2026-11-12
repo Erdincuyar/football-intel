@@ -1,0 +1,8 @@
+# Faz 9 asama 6: koyu tema. Streamlit Cloud bu dosyayi depo kokunden okur.
+[theme]
+base = "dark"
+primaryColor = "#3987e5"
+backgroundColor = "#111214"
+secondaryBackgroundColor = "#1a1b1e"
+textColor = "#f0efec"
+font = "sans serif"
