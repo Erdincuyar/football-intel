@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import pandas as pd
 import streamlit as st
 
-from footintel import ledger
+from footintel import ledger, store
 from footintel.config import LEAGUES, LEDGER_DIR
 
 st.set_page_config(page_title="Football Intelligence", layout="wide")
@@ -33,9 +33,42 @@ def load_ledger() -> pd.DataFrame:
     return ledger.load(LEDGER_DIR)
 
 
+@st.cache_data(ttl=3600)
+def load_preview() -> pd.DataFrame | None:
+    return store.read_table("preview_predictions")
+
+
+def show_preview() -> None:
+    """Bir sonraki haftanin on tahmini (resmi deftere henuz girmemis maclar)."""
+    pv = load_preview()
+    if pv is None or pv.empty:
+        return
+    pv = pv[~pv["in_ledger"].astype(bool)].copy()
+    if pv.empty:
+        return
+    pv["league"] = pv["league"].map(lambda k: LEAGUES[k].name if k in LEAGUES else k)
+    cols = {"match_date": "Tarih", "league": "Lig", "home_team": "Ev", "away_team": "Deplasman",
+            "p_home": "1", "p_draw": "X", "p_away": "2", "pred_score": "En olasi skor",
+            "p_over25": "2.5 Ust", "p_btts": "KG Var", "exp_corners": "Korner beklentisi"}
+    pv = pv.sort_values(["match_date", "league", "home_team"])[list(cols)].rename(columns=cols)
+    st.subheader(f"Onumuzdeki hafta: on tahmin ({len(pv)} mac)")
+    st.dataframe(
+        pv, hide_index=True, use_container_width=True,
+        column_config={c: st.column_config.ProgressColumn(c, format="%.0f%%", min_value=0,
+                                                          max_value=1)
+                       for c in ("1", "X", "2", "2.5 Ust", "KG Var")} | {
+            "Tarih": st.column_config.DateColumn("Tarih"),
+            "Korner beklentisi": st.column_config.NumberColumn(format="%.1f")})
+    st.caption("On tahmin: ayni model, bugune kadarki sonuclarla. Fikstur kaynagi openfootball "
+               "(acik veri). Resmi tahmin, mac football-data fikstur listesine girince "
+               "degistirilemez deftere yazilir ve basarisi olculur; on tahmin olculmez, her "
+               "gun yenilenir. Super Lig icin acik fikstur kaynagi yok (N/A).")
+
+
 led = load_ledger()
 if led.empty:
     st.info("Defterde henuz tahmin yok. Ilk tahminler haftalik CI calistirmasiyla eklenir.")
+    show_preview()
     st.stop()
 
 led["match_date"] = pd.to_datetime(led["match_date"])
@@ -46,6 +79,7 @@ if upcoming.empty:
     last = led["match_date"].max().date()
     st.info(f"Su an yaklasan mac yok. Son tahmin edilen maclar {last} tarihindeydi; "
             "yeni fikstur yayinlaninca CI tahminleri otomatik ekler.")
+    show_preview()
     st.stop()
 leagues = {LEAGUES[k].name: k for k in sorted(upcoming["league"].unique())}
 choice = st.multiselect("Lig", list(leagues), default=list(leagues))
@@ -79,3 +113,4 @@ version = led["model_version"].iloc[-1]
 st.caption(f"Model surumu: {version}. Olasiliklar mac oncesi kaydedildi; sonradan degistirilmez.")
 st.caption("* Dusuk guven: toplam korner modeli backtest'te lig ortalamasindan anlamli olarak "
            "iyi degil (Faz 5). Takim bazli korner tahminleri anlamli olarak daha iyi.")
+show_preview()

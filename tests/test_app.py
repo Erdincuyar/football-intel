@@ -109,6 +109,21 @@ def test_home_without_upcoming_matches(data_dir, monkeypatch):
     assert not at.exception, at.exception
     assert any("yaklasan mac yok" in i.value for i in at.info)
 
+    # Milli mac arasinda on tahmin tablosu yine gorunur; resmi defterdekiler tekrar edilmez
+    from footintel.analysis import preview as P
+    from tests.test_preview import CANDS, MATCHES
+    rnd = P.next_round(MATCHES, pd.Timestamp("2026-11-12"))
+    pfx, _ = P.to_fixtures(rnd, "E0", "2627", CANDS,
+                           aliases={"Nottingham Forest FC": "nott-m-forest"})
+    P.prediction_rows(pfx, fake_predictions(pfx), {"E0-2627-chelsea-man-city"}, "v-test",
+                      pd.Timestamp.today()).to_parquet(
+        data_dir / "clean" / "preview_predictions.parquet")
+    st.cache_data.clear()
+    at = AppTest.from_file(str(APP / "Home.py"), default_timeout=60).run()
+    assert not at.exception, at.exception
+    assert any("on tahmin (1 mac)" in h.value for h in at.subheader)
+    assert len(at.dataframe[0].value) == 1
+
 
 def test_match_center_with_history(data_dir):
     from footintel.analysis import history_eval as E
