@@ -106,6 +106,46 @@ takım, korner veren rakibe karşı modelin beklediğinden fazla korner kazanır
 Arayüzde **Eşleşme** sayfası. Sonuçlar `pipelines/build_matchup.py` çıktısında ve CI
 özetinde.
 
+## Yayın: Neon + Streamlit Community Cloud (Faz 8)
+
+Temiz veri CI'ın içinde üretilir ve repoya yazılmaz (her çalışmada parquet commit'lemek repoyu
+şişirir). Bu yüzden CI, uygulamanın okuduğu tabloları ücretsiz bir Neon PostgreSQL
+veritabanına (`app` şeması) yazar; Streamlit uygulaması oradan okur. Bağlantı adresi
+tanımlı değilse uygulama `data/clean/` altındaki dosyalara düşer, yani yerel geliştirme
+aynen çalışır (`src/footintel/store.py`).
+
+| Tablo (`app.` şeması) | İçerik |
+|---|---|
+| `matches_football_data` | 5 lig, maç sonuçları, istatistikler, oranlar |
+| `backtest_predictions` | walk-forward tahminleri (Model Performansı) |
+| `predictions` | tahmin defteri (repodaki `data/predictions/` ile aynı) |
+| `style_profile`, `style_now` | güncel stil profilleri (Taktik Profil, Eşleşme) |
+| `tactics_team_match_1516` | StatsBomb 2015/16 takım-maç metrikleri |
+| `json_docs` | küçük JSON çıktılar (kurallar, eşikler, gruplar, xT ızgarası) |
+| `meta` | son yayın zamanı |
+
+Kurulum (bir kez, ikisi de ücretsiz):
+
+1. **Neon**: neon.com'da hesap aç, bir proje oluştur, *Connection string*'i kopyala
+   (`postgresql://...?sslmode=require`).
+2. **GitHub**: repo > Settings > Secrets and variables > Actions > *New repository secret*:
+   ad `FOOTINTEL_DATABASE_URL`, değer bağlantı adresi. Bir sonraki main çalışması veriyi yazar
+   (Actions'tan *Run workflow* ile hemen de tetiklenebilir).
+3. **Streamlit Community Cloud**: share.streamlit.io'da GitHub ile giriş yap, *Create app*:
+   repo `Erdincuyar/football-intel`, branch `main`, dosya `app/Home.py`. *Advanced settings >
+   Secrets* kısmına:
+   ```toml
+   FOOTINTEL_DATABASE_URL = "postgresql://..."
+   ```
+
+Streamlit Cloud bağımlılıkları `app/requirements.txt`'ten kurar. Bu dosya `uv.lock`'tan
+üretilir ve CI aynı olup olmadığını kontrol eder:
+
+```bash
+uv export -q --no-hashes --no-dev --group app --no-emit-project \
+  --format requirements-txt > app/requirements.txt
+```
+
 ## Keşifsel analiz (EDA)
 
 `notebooks/01_eda.ipynb` gol, korner, ev avantajı ve bahis piyasası analizini içerir.

@@ -7,6 +7,12 @@ Calistirma (once veriyi indir, README'deki "Veriyi almak"):
 
 from __future__ import annotations
 
+# Streamlit Cloud paketi kurmadan calistirir; src/ klasorunu yola ekliyoruz.
+import sys  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
 import pandas as pd
 import streamlit as st
 

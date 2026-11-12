@@ -2,30 +2,36 @@
 
 from __future__ import annotations
 
+# Streamlit Cloud paketi kurmadan calistirir; src/ klasorunu yola ekliyoruz.
+import sys  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
 import altair as alt
 import pandas as pd
 import streamlit as st
 
-from footintel import ledger
+from footintel import ledger, store
 from footintel.analysis.eda import calibration_table, played
-from footintel.config import CLEAN_DIR, LEAGUES, LEDGER_DIR
+from footintel.config import LEAGUES, LEDGER_DIR
 from footintel.models import backtest as B
 
 st.set_page_config(page_title="Model Performansi", layout="wide")
 st.title("Model Performansi")
 
 
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load():
-    fd = played(pd.read_parquet(CLEAN_DIR / "matches_football_data.parquet"))
-    bt = pd.read_parquet(CLEAN_DIR / "backtest_predictions.parquet")
-    return fd, bt
+    # Veritabani (Neon) tanimliysa oradan, degilse data/clean'den okunur.
+    fd = store.read_table("matches_football_data")
+    bt = store.read_table("backtest_predictions")
+    return (played(fd) if fd is not None else None), bt
 
 
-try:
-    fd, bt = load()
-except FileNotFoundError as exc:
-    st.error(f"Veri bulunamadi: {exc}. README'deki 'Veriyi almak' adimini uygula.")
+fd, bt = load()
+if fd is None or bt is None:
+    st.error("Veri bulunamadi. README'deki 'Veriyi almak' adimini uygula.")
     st.stop()
 
 st.header("Canli defter")

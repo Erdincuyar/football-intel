@@ -40,6 +40,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    services:
+      # Faz 8: veri katmaninin Postgres testleri icin gecici bir veritabani (yalnizca test).
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -54,7 +63,15 @@ jobs:
       - name: Lint
         run: uv run ruff check .
 
+      - name: Streamlit Cloud gereksinimleri guncel mi?
+        # app/requirements.txt uv.lock'tan uretilir; elle duzenlenmez.
+        run: >
+          uv export -q --no-hashes --no-dev --group app --no-emit-project
+          --format requirements-txt | diff - app/requirements.txt
+
       - name: Testler
+        env:
+          FOOTINTEL_TEST_DATABASE_URL: postgresql://postgres:test@localhost:5432/postgres
         run: uv run pytest -q
 
       - name: Veri hattini calistir (football-data.co.uk)
@@ -107,6 +124,14 @@ jobs:
 
       - name: "Faz 7: stil gruplari ve eslesme kurallarinin testi"
         run: uv run python pipelines/build_matchup.py
+
+      - name: "Faz 8: uygulama verisini Neon'a yayinla"
+        # Secret tanimli degilse betik kendisi atlar. PR'larda calismaz: canli veritabanina
+        # yalnizca main yazar.
+        if: github.event_name != 'pull_request'
+        env:
+          FOOTINTEL_DATABASE_URL: ${{ secrets.FOOTINTEL_DATABASE_URL }}
+        run: uv run python pipelines/publish_app_data.py
 
       - name: EDA ozeti
         run: uv run python pipelines/eda_report.py
