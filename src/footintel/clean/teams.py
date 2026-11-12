@@ -4,7 +4,7 @@ Ayni takim her kaynakta farkli yazilir: football-data "Man United", Understat
 "Manchester United", FBref "Manchester Utd". Kaynaklari birlestirebilmek icin her
 takima tek bir kimlik (team_id) veriyoruz.
 
-Kanonik kaynak football-data.co.uk: 5 ligin hepsini kapsayan tek kaynak o.
+Kanonik kaynak football-data.co.uk: 6 ligin hepsini kapsayan tek kaynak o.
 Diger kaynaklarin isimleri data/reference/team_aliases.csv dosyasinda bu
 kimliklere eslenir (Adim 2'de, Understat eklenince).
 """

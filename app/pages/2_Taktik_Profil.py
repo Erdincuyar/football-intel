@@ -44,7 +44,7 @@ tab_now, tab_sb = st.tabs(["Guncel stil profili", "StatsBomb 2015/16"])
 
 with tab_now:
     st.caption(
-        "Kaynak: football-data.co.uk mac istatistikleri (5 lig, Super Lig dahil). "
+        "Kaynak: football-data.co.uk mac istatistikleri (6 lig, Super Lig dahil). "
         "'Tahmini' kolonlar olay verisi olmadan, sut/korner/faul sayilarindan dogrusal bir "
         "modelle hesaplanir. Model StatsBomb 2015/16'da egitildi ve her seferinde bir ligi "
         "disarida birakarak test edildi; hata payi asagida."
