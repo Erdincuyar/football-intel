@@ -34,6 +34,13 @@ if led.empty:
 
 led["match_date"] = pd.to_datetime(led["match_date"])
 upcoming = led[led["match_date"] >= pd.Timestamp.today().normalize()]
+if upcoming.empty:
+    # Milli mac arasi gibi haftalarda defterdeki tum maclar geride kalir. Bos tabloyu
+    # filtrelemeye calismak yerine bunu acikca soyluyoruz.
+    last = led["match_date"].max().date()
+    st.info(f"Su an yaklasan mac yok. Son tahmin edilen maclar {last} tarihindeydi; "
+            "yeni fikstur yayinlaninca CI tahminleri otomatik ekler.")
+    st.stop()
 leagues = {LEAGUES[k].name: k for k in sorted(upcoming["league"].unique())}
 choice = st.multiselect("Lig", list(leagues), default=list(leagues))
 upcoming = upcoming[upcoming["league"].isin([leagues[c] for c in choice])]
@@ -41,8 +48,10 @@ upcoming = upcoming[upcoming["league"].isin([leagues[c] for c in choice])]
 wanted = {("1x2", "home"): "1", ("1x2", "draw"): "X", ("1x2", "away"): "2",
           ("ou25", "over"): "2.5 Ust", ("btts", "yes"): "KG Var",
           ("corners_ou95", "over"): "Korner 9.5 Ust"}
-view = upcoming[[(m, s) in wanted for m, s in zip(upcoming["market"], upcoming["selection"],
-                                                   strict=True)]].copy()
+keep = pd.Series([(m, s) in wanted for m, s in zip(upcoming["market"], upcoming["selection"],
+                                                    strict=True)], index=upcoming.index,
+                 dtype=bool)
+view = upcoming[keep].copy()
 view["col"] = [wanted[(m, s)] for m, s in zip(view["market"], view["selection"], strict=True)]
 table = view.pivot_table(index=["match_date", "league", "home_team", "away_team"],
                          columns="col", values="prob").reset_index()
