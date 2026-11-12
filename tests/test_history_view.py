@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from footintel.analysis import history_view as V
 from tests.test_history_eval import _eval, _preds
@@ -50,3 +51,27 @@ def test_missing_probabilities_show_na():
     m["p_over25"] = np.nan
     assert _rows(m)["2.5 Ust/Alt"]["pred"] == "N/A"
     assert pd.isna(m["p_over25"])
+
+
+def test_cumulative_by_week_counts_only_evaluable():
+    ev = pd.DataFrame({"matchweek": [1, 1, 2, 3],
+                       "result_ok": pd.array([True, False, pd.NA, True], dtype="boolean"),
+                       "result_base_ok": pd.array([True, True, pd.NA, False],
+                                                  dtype="boolean")})
+    c = V.cumulative_by_week(ev, "result").set_index(["series", "matchweek"])
+    assert c.loc[("Model", 1), "pct"] == 50 and c.loc[("Model", 2), "n"] == 2
+    assert c.loc[("Model", 3), "pct"] == pytest.approx(200 / 3)
+    assert c.loc[("Kiyas", 3), "pct"] == pytest.approx(200 / 3)
+    assert V.cumulative_by_week(ev, "corners_total").empty     # kolon yok -> bos, uydurma yok
+
+
+def test_accuracy_table_marks_score_without_baseline():
+    t = V.accuracy_table(_ev_summary())
+    row = t.set_index("Tahmin").loc["Skor"]
+    assert row["Kiyas"] == "N/A" and np.isnan(row["Kiyas %"])
+    assert t.set_index("Tahmin").loc["Mac sonucu (1X2)", "Kiyas"] == "piyasa favorisi"
+
+
+def _ev_summary():
+    from footintel.analysis import history_eval as E
+    return E.summarize(_eval().assign(_all=1), ["_all"])

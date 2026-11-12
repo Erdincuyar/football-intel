@@ -86,7 +86,7 @@ def data_dir(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("page", ["Home.py", "pages/1_Model_Performance.py",
                                   "pages/2_Taktik_Profil.py", "pages/3_Eslesme.py",
-                                  "pages/4_Mac_Merkezi.py"])
+                                  "pages/4_Mac_Merkezi.py", "pages/5_Performans_Paneli.py"])
 def test_page_runs(data_dir, page):
     at = AppTest.from_file(str(APP / page), default_timeout=60).run()
     assert not at.exception, at.exception
@@ -133,3 +133,11 @@ def test_match_center_with_history(data_dir):
     cards = [m.value for m in at.markdown if m.value.startswith("<div class=\"fi-card")]
     assert len(cards) == 3                                    # son haftanin 3 maci
     assert "N/A" in cards[0]                                  # kart modeli yok -> N/A
+
+    # Performans Paneli ayni veriyle
+    st.cache_data.clear()
+    at = AppTest.from_file(str(APP / "pages/5_Performans_Paneli.py"), default_timeout=60).run()
+    assert not at.exception, at.exception
+    assert len(at.metric) == 7 and at.metric[0].value.startswith("%")
+    assert at.metric[1].value == "N/A"                         # ilk yari modeli yok
+    assert len(at.dataframe) == 2

@@ -66,11 +66,13 @@ if summary is not None and not summary.empty:
         r = s.loc[m]
         pm1 = f" · ±1: %{100 * r['pct_pm1']:.0f}" if pd.notna(r.get("pct_pm1")) else ""
         base = r.get("base_pct")
-        delta = (f"{100 * (r['pct'] - base):+.0f} puan kiyasa gore" if pd.notna(base)
-                 else None)
+        diff = 100 * (r["pct"] - base) if pd.notna(base) else None
+        delta = None if diff is None else ("±0 puan" if abs(diff) < 0.5 else f"{diff:+.0f} puan")
         col.metric(label, f"%{100 * r['pct']:.0f}", delta,
-                   help=f"{int(r['hits'])}/{int(r['n'])} mac{pm1}")
-    st.caption("Kiyas: 1X2 ve 2.5 icin kapanis oranlarindaki piyasa favorisi; digerleri icin "
+                   help=f"{int(r['hits'])}/{int(r['n'])} mac{pm1}",
+                   delta_color="off" if delta == "±0 puan" else "normal")
+    st.caption("Yesil/kirmizi kutu: kiyasa gore fark (yuzde puan). "
+               "Kiyas: 1X2 ve 2.5 icin kapanis oranlarindaki piyasa favorisi; digerleri icin "
                "ligin onceki sezon ortalamasi. Tek haftalik oranlar az macla hesaplanir, "
                "gurultuludur; sezon resmi icin Performans Paneli.")
 
