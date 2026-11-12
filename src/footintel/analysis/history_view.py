@@ -155,7 +155,7 @@ CSS = """
   margin-bottom:14px}
 .fi-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .fi-side{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
-.fi-right{justify-content:flex-end;flex-direction:row-reverse}
+.fi-right{justify-content:flex-start;flex-direction:row-reverse}
 .fi-badge{color:#fff;font-weight:700;font-size:.75rem;border-radius:50%;width:38px;
   height:38px;display:inline-flex;align-items:center;justify-content:center;flex:none}
 .fi-team{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -168,3 +168,58 @@ CSS = """
 .fi-na{color:#9ca3af}
 </style>
 """
+
+
+# --- Performans Paneli ------------------------------------------------------------------
+
+MARKET_TR = {"result": "Mac sonucu (1X2)", "ht_result": "Ilk yari sonucu", "score": "Skor",
+             "ou25": "2.5 Ust/Alt", "btts": "Karsilikli gol", "red": "Kirmizi kart",
+             "goals_total": "Toplam gol", "corners_home": "Korner (ev)",
+             "corners_away": "Korner (dep)", "corners_total": "Korner (toplam)",
+             "yellow_home": "Sari kart (ev)", "yellow_away": "Sari kart (dep)",
+             "yellow_total": "Sari kart (toplam)"}
+BASE_TR = {"result": "piyasa favorisi", "ou25": "piyasa"}
+METRIC_TR = {"brier_1x2": "Brier 1X2", "logloss_1x2": "Log loss 1X2", "brier_ht": "Brier ilk yari",
+             "brier_ou25": "Brier 2.5", "logloss_ou25": "Log loss 2.5", "brier_btts": "Brier KG",
+             "logloss_btts": "Log loss KG", "brier_red": "Brier kirmizi",
+             "logloss_red": "Log loss kirmizi", "mae_goals_total": "MAE toplam gol",
+             "mae_corners_home": "MAE korner (ev)", "mae_corners_away": "MAE korner (dep)",
+             "mae_corners_total": "MAE korner (toplam)", "mae_yellow_home": "MAE sari (ev)",
+             "mae_yellow_away": "MAE sari (dep)", "mae_yellow_total": "MAE sari (toplam)"}
+
+
+def accuracy_table(summary: pd.DataFrame) -> pd.DataFrame:
+    """summarize() ciktisini (tek grup) okunur tabloya cevirir. Yuzdeler 0-100."""
+    s = summary.copy()
+    out = pd.DataFrame({
+        "Tahmin": s["market"].map(MARKET_TR),
+        "n": s["n"],
+        "Model %": 100 * s["pct"],
+        "Model ±1 %": 100 * s["pct_pm1"] if "pct_pm1" in s else np.nan,
+        "Kiyas %": 100 * s["base_pct"] if "base_pct" in s else np.nan,
+        "Kiyas ±1 %": 100 * s["base_pct_pm1"] if "base_pct_pm1" in s else np.nan,
+        "Kiyas": s["market"].map(lambda m: BASE_TR.get(m, "onceki sezon ort.")),
+    })
+    out.loc[s["market"].eq("score").to_numpy(), "Kiyas"] = NA     # skorda kiyas yok
+    return out.reset_index(drop=True)
+
+
+def cumulative_by_week(ev: pd.DataFrame, market: str, pm1: bool = False) -> pd.DataFrame:
+    """Sezon icinde haftalara gore kumulatif isabet: model ve kiyas (uzun format).
+
+    Tek haftalik oranlar 5-10 macla hesaplanir ve cok gurultuludur; kumulatif cizgi
+    "simdiye kadar" sorusunu dogru yanitlar. n her noktada verilir.
+    """
+    suffix = "_ok_pm1" if pm1 else "_ok"
+    rows = []
+    for name, col in (("Model", f"{market}{suffix}"), ("Kiyas", f"{market}_base{suffix}")):
+        if col not in ev:
+            continue
+        ok = ev[col]
+        g = pd.DataFrame({"matchweek": ev["matchweek"], "n": ok.notna().astype(int),
+                          "hits": ok.fillna(False).astype(int)}).groupby("matchweek").sum()
+        g = g.cumsum()
+        g = g[g["n"] > 0]
+        rows.append(g.assign(series=name, pct=100 * g["hits"] / g["n"]).reset_index())
+    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame(
+        columns=["matchweek", "n", "hits", "series", "pct"])
