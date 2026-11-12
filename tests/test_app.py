@@ -85,7 +85,8 @@ def data_dir(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("page", ["Home.py", "pages/1_Model_Performance.py",
-                                  "pages/2_Taktik_Profil.py", "pages/3_Eslesme.py"])
+                                  "pages/2_Taktik_Profil.py", "pages/3_Eslesme.py",
+                                  "pages/4_Mac_Merkezi.py", "pages/5_Performans_Paneli.py"])
 def test_page_runs(data_dir, page):
     at = AppTest.from_file(str(APP / page), default_timeout=60).run()
     assert not at.exception, at.exception
@@ -107,3 +108,36 @@ def test_home_without_upcoming_matches(data_dir, monkeypatch):
     at = AppTest.from_file(str(APP / "Home.py"), default_timeout=60).run()
     assert not at.exception, at.exception
     assert any("yaklasan mac yok" in i.value for i in at.info)
+
+
+def test_match_center_with_history(data_dir):
+    from footintel.analysis import history_eval as E
+    from footintel.models import backtest as B
+    from footintel.models import history as H
+    from tests.test_history import CCFG, CFG, league
+
+    fd = league()
+    bt = B.walk_forward(fd, "E0", ["2526"], CFG, CCFG)
+    h = H.assemble(fd[fd["season"] == "2526"], bt, None, pd.Timestamp("2026-11-12"))
+    ev = E.evaluate_matches(h, E.match_results(fd), E.league_priors(fd))
+    clean = data_dir / "clean"
+    h.to_parquet(clean / "historical_predictions.parquet")
+    ev.to_parquet(clean / "prediction_evaluation.parquet")
+    E.summarize(ev, ["model_version", "league", "season", "matchweek"]).assign(
+        scope="week").to_parquet(clean / "evaluation_summary.parquet")
+    import streamlit as st
+    st.cache_data.clear()
+    at = AppTest.from_file(str(APP / "pages/4_Mac_Merkezi.py"), default_timeout=60).run()
+    assert not at.exception, at.exception
+    assert len(at.metric) == 6 and at.metric[0].value.startswith("%")
+    cards = [m.value for m in at.markdown if m.value.startswith("<div class=\"fi-card")]
+    assert len(cards) == 3                                    # son haftanin 3 maci
+    assert "N/A" in cards[0]                                  # kart modeli yok -> N/A
+
+    # Performans Paneli ayni veriyle
+    st.cache_data.clear()
+    at = AppTest.from_file(str(APP / "pages/5_Performans_Paneli.py"), default_timeout=60).run()
+    assert not at.exception, at.exception
+    assert len(at.metric) == 7 and at.metric[0].value.startswith("%")
+    assert at.metric[1].value == "N/A"                         # ilk yari modeli yok
+    assert len(at.dataframe) == 2

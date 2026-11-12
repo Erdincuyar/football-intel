@@ -73,8 +73,10 @@ def walk_forward(
                            warm_start=cm)
             for r in block.itertuples(index=False):
                 m = S.score_matrix(gm, r.home_team_id, r.away_team_id)
+                (score, p_score), = S.correct_score_top(m, 1)
                 row = {"match_id": r.match_id, "league": league, "season": season,
-                       "fit_date": ref.date(), **S.goal_markets(m)}
+                       "fit_date": ref.date(), **S.goal_markets(m),
+                       "pred_score": score, "p_pred_score": p_score}
                 if not (pd.isna(r.home_goals) or pd.isna(r.away_goals)):
                     hg, ag = min(int(r.home_goals), 10), min(int(r.away_goals), 10)
                     row["ll_score"] = float(np.log(max(m[hg, ag], 1e-12)))

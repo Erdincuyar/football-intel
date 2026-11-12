@@ -38,9 +38,12 @@ BOOL_OID = 16                     # Postgres boolean tip kimligi
 
 # Uygulamanin okudugu tablolar (data/clean/<ad>.parquet) ve JSON ciktilari.
 APP_TABLES = ["matches_football_data", "backtest_predictions", "style_profile",
-              "tactics_team_match_1516", "style_now"]
+              "tactics_team_match_1516", "style_now",
+              # Faz 9 turetilmis tablolar (her calismada bastan uretilir; tahminler degil)
+              "match_results", "prediction_evaluation", "evaluation_summary",
+              "evaluation_metrics"]
 APP_JSON = ["tactics_proxy", "tactics_summary", "xt_grid", "matchup_rules",
-            "style_thresholds", "style_clusters"]
+            "style_thresholds", "style_clusters", "cards_eval", "halftime_eval"]
 
 
 def clean_url(raw: str) -> str:
@@ -188,6 +191,38 @@ def publish(url: str, clean_dir: Path | None = None, ledger_dir: Path | None = N
     return {"tables": {k: len(v) for k, v in frames.items()}, "json": sorted(docs)}
 
 
+def append_immutable(url: str, name: str, df: pd.DataFrame, key: list[str]) -> int:
+    """Yalnizca-ekleme tablosu: anahtar zaten varsa satir YAZILMAZ (eski tahmin korunur).
+
+    Gecmis tahminler bir kez yazilir; ayni model surumuyle yeniden calistirmak hicbir seyi
+    degistirmez, yeni surum yeni satirlar ekler. Donen deger: eklenen satir sayisi.
+    """
+    from psycopg import sql
+
+    ident = sql.Identifier(SCHEMA, name)
+    stage = sql.Identifier(f"_stage_{name}")
+    cols = sql.SQL(", ").join(
+        sql.SQL("{} {}").format(sql.Identifier(str(c)), sql.SQL(pg_type(df[c])))
+        for c in df.columns)
+    names = sql.SQL(", ").join(sql.Identifier(str(c)) for c in df.columns)
+    with _connect(url) as conn, conn.cursor() as cur:
+        cur.execute(f"CREATE SCHEMA IF NOT EXISTS {SCHEMA}")
+        cur.execute(sql.SQL("CREATE TABLE IF NOT EXISTS {} ({}, PRIMARY KEY ({}))").format(
+            ident, cols, sql.SQL(", ").join(sql.Identifier(k) for k in key)))
+        # Yeni model surumu yeni kolon getirebilir (or. ilk yari olasiliklari). Eski satirlar
+        # degismez; yalnizca tabloya bos (NULL) kolon eklenir.
+        for c in df.columns:
+            cur.execute(sql.SQL("ALTER TABLE {} ADD COLUMN IF NOT EXISTS {} {}").format(
+                ident, sql.Identifier(str(c)), sql.SQL(pg_type(df[c]))))
+        cur.execute(sql.SQL("CREATE TEMP TABLE {} ({}) ON COMMIT DROP").format(stage, cols))
+        with cur.copy(sql.SQL("COPY {} ({}) FROM STDIN").format(stage, names)) as cp:
+            for row in df.itertuples(index=False, name=None):
+                cp.write_row([_py(v) for v in row])
+        cur.execute(sql.SQL("INSERT INTO {} ({}) SELECT {} FROM {} ON CONFLICT DO NOTHING")
+                    .format(ident, names, names, stage))
+        return cur.rowcount
+
+
 # --- okuma ---------------------------------------------------------------------------
 
 def read_table(name: str, url: str | None = None) -> pd.DataFrame | None:
@@ -242,3 +277,4 @@ def published_at(url: str | None = None) -> str | None:
             return row[0] if row else None
     except Exception:
         return None
+

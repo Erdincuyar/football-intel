@@ -27,6 +27,7 @@ from footintel.models.strength import ModelConfig
 
 log = logging.getLogger("build_cards")
 TUNE, TEST = ["2324"], ["2425", "2526"]
+HISTORY = ["2526", "2627"]      # Mac Merkezi: ayar donemlerinden SONRAKI sezonlar
 BASE_CFG = ModelConfig(family="negbin", dixon_coles=False, xi=0.004, penalty=16.0)
 PENALTIES = [4.0, 16.0, 64.0]
 
@@ -80,7 +81,10 @@ def main() -> None:
            "mae_diff_ci": {s: [round(v, 4) for v in c] for s, c in cis.items()},
            "gate_passed": gate, "coverage": cov.reset_index().to_dict("records")}
     (CLEAN_DIR / "cards_eval.json").write_text(json.dumps(out, indent=1, default=float))
-    pd.concat(parts).to_parquet(CLEAN_DIR / "cards_backtest.parquet", index=False)
+    # Mac Merkezi icin 2025/26 (test) + 2026/27 (oynanan kisim) tahminleri
+    hist = pd.concat([*(p for p in parts if p["season"].iloc[0] in HISTORY),
+                      run(fd, [s for s in HISTORY if s not in TEST], cfg)], ignore_index=True)
+    hist.to_parquet(CLEAN_DIR / "cards_backtest.parquet", index=False)
 
     pd.set_option("display.width", 200)
     text = "\n\n".join([
