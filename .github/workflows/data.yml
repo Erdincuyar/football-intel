@@ -106,6 +106,9 @@ jobs:
           uv run python pipelines/predict_upcoming.py
           ${{ github.event_name == 'pull_request' && '--dry-run' || '' }}
 
+      - name: "On tahmin: her ligin bir sonraki haftasi (openfootball + fixturedownload)"
+        run: uv run python pipelines/build_preview.py
+
       - name: Tahmin defterini degerlendir
         run: uv run python pipelines/evaluate_ledger.py
 
