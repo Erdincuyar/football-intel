@@ -17,7 +17,7 @@ from footintel.analysis import history_eval as E
 from footintel.analysis import history_view as V
 from footintel.config import LEAGUES
 
-MODEL, BASE = "#2a78d6", "#eb6834"          # kategorik sira: 1 mavi, 2 turuncu
+MODEL, BASE = "#3987e5", "#d95926"          # kategorik sira 1-2, koyu tema tonlari
 
 st.set_page_config(page_title="Performans Paneli", layout="wide")
 st.title("Performans Paneli")

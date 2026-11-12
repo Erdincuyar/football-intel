@@ -134,7 +134,8 @@ def card_html(m: pd.Series) -> str:
     side = []
     for team in (m["home_team"], m["away_team"]):
         abbr, color = badge(team)
-        side.append(f'<span class="fi-badge" style="background:{color}">{e(abbr)}</span>'
+        side.append(f'<span class="fi-badge" style="background:{color}" '
+                    f'title="{e(team)}">{e(abbr)}</span>'
                     f'<span class="fi-team">{e(team)}</span>')
     body = "".join(
         f"<tr><td>{e(r['label'])}</td><td>{e(r['pred'])}</td><td>{e(r['actual'])}</td>"
@@ -151,21 +152,25 @@ def card_html(m: pd.Series) -> str:
 
 CSS = """
 <style>
-.fi-card{border:1px solid rgba(128,128,128,.35);border-radius:12px;padding:12px 14px;
-  margin-bottom:14px}
+.fi-card{border:1px solid rgba(255,255,255,.10);border-radius:14px;padding:14px 16px;
+  margin-bottom:16px;background:linear-gradient(180deg,rgba(57,135,229,.08),rgba(255,255,255,.02))}
 .fi-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .fi-side{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
 .fi-right{justify-content:flex-start;flex-direction:row-reverse}
-.fi-badge{color:#fff;font-weight:700;font-size:.75rem;border-radius:50%;width:38px;
-  height:38px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.fi-badge{color:#fff;font-weight:700;font-size:.75rem;border-radius:50%;width:40px;
+  height:40px;display:inline-flex;align-items:center;justify-content:center;flex:none;
+  box-shadow:0 0 0 2px rgba(255,255,255,.18)}
 .fi-team{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.fi-score{font-size:1.5rem;font-weight:700;white-space:nowrap;text-align:center}
-.fi-date{opacity:.65;font-size:.8rem;text-align:center;margin:2px 0 8px}
+.fi-score{font-size:1.6rem;font-weight:800;white-space:nowrap;text-align:center;
+  letter-spacing:.04em}
+.fi-date{opacity:.6;font-size:.8rem;text-align:center;margin:2px 0 10px}
 .fi-table{width:100%;border-collapse:collapse;font-size:.85rem}
-.fi-table th,.fi-table td{padding:3px 6px;border-top:1px solid rgba(128,128,128,.2);
+.fi-table th{opacity:.7;font-weight:600}
+.fi-table th,.fi-table td{padding:4px 6px;border-top:1px solid rgba(128,128,128,.18);
   text-align:left}
-.fi-ok{color:#16a34a;font-weight:700}.fi-bad{color:#dc2626;font-weight:700}
+.fi-ok{color:#22c55e;font-weight:700}.fi-bad{color:#ef4444;font-weight:700}
 .fi-na{color:#9ca3af}
+@media (max-width:640px){.fi-team{display:none}.fi-table{font-size:.78rem}}
 </style>
 """
 
