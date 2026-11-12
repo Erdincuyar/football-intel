@@ -106,6 +106,58 @@ def team_season(tm: pd.DataFrame, metrics: list[str]) -> pd.DataFrame:
     return out.reset_index()
 
 
+# --- Dis dogrulama: PPDA'miz Understat'inkiyle ayni siralamayi veriyor mu? -------------
+
+def understat_team_ppda(data: dict) -> pd.DataFrame:
+    """Understat lig-sezon JSON'undan takim basina ortalama PPDA (mac bazinda att/def).
+
+    Understat'in tanimi bizimkine yakin ama ayni degil (alan sinirlari ve sayilan savunma
+    aksiyonlari farkli olabilir). Bu yuzden seviyeyi degil, takimlarin SIRALAMASINI
+    karsilastiriyoruz: iki olcum ayni seyi olcuyorsa siralama tutarli olmali.
+    """
+    rows = []
+    for team in data["teams"].values():
+        vals = []
+        for m in team["history"]:
+            p = m.get("ppda") or {}
+            try:
+                att, deff = float(p["att"]), float(p["def"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if deff > 0:
+                vals.append(att / deff)
+        if vals:
+            rows.append({"team_us": team["title"], "ppda_us": float(np.mean(vals)),
+                         "matches_us": len(vals)})
+    return pd.DataFrame(rows)
+
+
+def ppda_external_check(tm: pd.DataFrame, understat: dict[str, pd.DataFrame]) -> tuple[
+        pd.DataFrame, pd.DataFrame]:
+    """Lig bazinda Spearman siralama korelasyonu: bizim PPDA vs Understat PPDA.
+
+    Doner: (lig ozeti, takim tablosu). Isimler team_matching ile eslenir; eslesmeyen takim
+    sayisi ozet tabloda gorunur (sessizce dusurulmez).
+    """
+    from footintel.clean.team_matching import match_teams
+
+    ours = tm.groupby(["league", "team"])["ppda"].mean().rename("ppda_ours").reset_index()
+    teams, summary = [], []
+    for lg, us in understat.items():
+        o = ours[ours["league"] == lg]
+        res = match_teams(us["team_us"].tolist(), {t: t for t in o["team"]})
+        us = us.assign(team=[r.team_id for r in res])
+        j = o.merge(us.dropna(subset=["team"]), on="team")
+        teams.append(j)
+        rho = j["ppda_ours"].rank().corr(j["ppda_us"].rank()) if len(j) >= 5 else np.nan
+        summary.append({"league": lg, "teams_matched": len(j),
+                        "teams_unmatched": int(us["team"].isna().sum()),
+                        "spearman": rho, "mean_ours": j["ppda_ours"].mean(),
+                        "mean_understat": j["ppda_us"].mean()})
+    return pd.DataFrame(summary), (pd.concat(teams, ignore_index=True) if teams
+                                   else pd.DataFrame())
+
+
 # --- football-data.co.uk'tan guncel stil profili --------------------------------------
 
 # Faul sayilari bilerek disarida: 2015/16 tanim kontrolunde StatsBomb, football-data'dan

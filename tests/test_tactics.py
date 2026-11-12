@@ -131,3 +131,25 @@ def test_slim_events_flattens_nested_json():
         70, "Corner", "Incomplete", True)
     assert (s["shot_xg"], s["end_x"], s["shot_outcome"]) == (0.2, 120, "Goal")
     assert (df["match_id"] == 7).all()
+
+
+def test_ppda_external_check_ranks_and_names():
+    # Sentetik: Understat isimleri kisaltilmis, degerler bizimkinin 1.2 kati (ayni siralama)
+    from footintel.analysis import tactics as A
+    ours = {"Tottenham Hotspur": 9.0, "Leicester City": 12.7, "Arsenal": 10.9,
+            "Stoke City": 12.5, "Manchester City": 10.3, "West Ham United": 11.8}
+    tm = pd.DataFrame([{"league": "E0", "team": t, "ppda": v} for t, v in ours.items()
+                       for _ in range(2)])
+    short = {"Tottenham Hotspur": "Tottenham", "Leicester City": "Leicester",
+             "Arsenal": "Arsenal", "Stoke City": "Stoke", "Manchester City": "Manchester City",
+             "West Ham United": "West Ham"}
+    data = {"teams": {str(i): {"title": short[t], "history": [
+        {"ppda": {"att": v * 12, "def": 10}}, {"ppda": {"att": 1, "def": 0}}]}
+        for i, (t, v) in enumerate(ours.items())}}
+    us = A.understat_team_ppda(data)
+    assert us["matches_us"].eq(1).all()                 # def=0 olan mac atlandi
+    summ, teams = A.ppda_external_check(tm, {"E0": us})
+    row = summ.iloc[0]
+    assert row["teams_matched"] == 6 and row["teams_unmatched"] == 0
+    assert row["spearman"] == pytest.approx(1.0)
+    assert row["mean_understat"] == pytest.approx(1.2 * row["mean_ours"])

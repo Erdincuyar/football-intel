@@ -71,3 +71,28 @@ def download_all(*, force: bool = False) -> list[Path]:
             log.info("Indirildi: %s (%d mac)", path.name, len(data["dates"]))
             paths.append(path)
     return paths
+
+
+def download_season(league: str, season: str, *, force: bool = False) -> Path:
+    """Tek bir lig-sezonu indirir (or. Faz 6'daki PPDA karsilastirmasi icin 2015/16)."""
+    path = raw_path(league, season)
+    if path.exists() and not force:
+        return path
+    slug = UNDERSTAT_LEAGUES[league]
+    session = PoliteSession(delay=2.0, headers={"X-Requested-With": "XMLHttpRequest"})
+    home = session.get(BASE_URL)
+    home.raise_for_status()
+    if "come back soon" in home.text.lower():
+        raise SourceUnavailable("Understat bakim sayfasi gosteriyor ('We will come back soon').")
+    url = f"{BASE_URL}/getLeagueData/{slug}/{season_start_year(season)}"
+    response = session.get(url, headers={"Referer": f"{BASE_URL}/league/{slug}"})
+    response.raise_for_status()
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise SourceUnavailable(f"{url}: JSON beklenirken baska bir cevap geldi") from exc
+    if "teams" not in data:
+        raise ValueError(f"{url}: beklenen 'teams' alani yok; format degismis olabilir")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    return path
