@@ -61,6 +61,51 @@ uv run streamlit run app/Home.py
 Ana sayfa yaklaşan maçların olasılıklarını, **Model Performansı** sayfası canlı defterin ve
 walk-forward backtest'in sonuçlarını (piyasayla kıyas, kalibrasyon) gösterir.
 
+## Taktik metrikler (Faz 6)
+
+Olay verisi (her pasın, presin, şutun sahadaki konumu) ücretli bir ürün. Bu yüzden iki
+katmanlı bir yol izliyoruz:
+
+1. **StatsBomb açık verisi, 2015/16** (PL, La Liga, Serie A, Ligue 1; 1517 maç):
+   PPDA, savunma yüksekliği, ileri pres oranı, field tilt, xG/xT payı, uzun pas ve orta
+   oranı (`src/footintel/features/tactics.py`). xT (expected threat) ızgarası aynı veriden
+   fit edilir.
+2. **Güncel sezon stil profili** (5 lig, Süper Lig dahil): football-data'nın şut, isabetli
+   şut, korner ve faul sayılarından. Zengin metriklerin bir kısmı bu sayılardan doğrusal bir
+   modelle tahmin edilir. Model StatsBomb verisinde, her seferinde bir lig dışarıda
+   bırakılarak test edilir ve yalnızca dış ligde R² ≥ 0.6 olan metrikler kullanılır.
+
+2015/16 sonuçları (`pipelines/build_tactics.py`):
+
+| Soru | Bulgu |
+| --- | --- |
+| Hangi metrik kalıcı bir stil? | Pas isabeti, uzun pas oranı, pas payı (sezon güvenilirliği ≥ 0.95). Korner payı en gürültülü (0.60). |
+| İlk yarı, ikinci yarı puanını ne kadar açıklar? (R²) | xG payı 0.45 > gol farkı 0.42 > şut payı 0.38 ≈ isabetli şut payı 0.37 > korner payı 0.28 |
+| Basit sayılardan tahmin edilebilir mi? (şut, isabetli şut ve korner payından; dış lig R²) | xG payı 0.88, xT payı 0.87, field tilt 0.77 kullanılıyor. Pas payı 0.58 ile eşiğin altında. **PPDA 0.10: pres yoğunluğu bu sayılardan çıkmıyor.** |
+| İki kaynak aynı şeyi mi sayıyor? (2015/16, maç başı) | Şut, isabetli şut ve korner %1-3 farkla aynı. Faulde StatsBomb %8-17 fazla sayıyor, bu yüzden faul proxy'ye girmiyor. |
+
+Arayüzde **Taktik Profil** sayfası. Veri: [StatsBomb Open Data](https://github.com/statsbomb/open-data)
+(kaynak gösterilerek, ticari olmayan kullanım).
+
+## Taktiksel eşleşme (Faz 7)
+
+Kurallar veriye bakılmadan önce yazıldı (`src/footintel/analysis/rules.py`). Her kural,
+bir takımın gücünü rakibin ilgili zayıflığıyla eşleştiriyor. Örnek: "çok korner kazanan
+takım, korner veren rakibe karşı modelin beklediğinden fazla korner kazanır."
+
+- **Profil:** Her takımın o maçtan önceki son 10 maçı (football-data). "Yüksek" ve "düşük"
+  eşikleri aynı ligin önceki sezonlarından gelir, böylece sızıntı olmaz.
+- **Test:** Kural, modelin artığına karşı test edilir (gerçekleşen eksi Dixon-Coles veya
+  korner modeli). Modelin zaten bildiğini kural diye saymamak için bu gerekli.
+- **Kapı:** Bir kural iki şartla tutulur: 2022-24 keşif döneminde Benjamini-Hochberg
+  düzeltmesinden sonra anlamlı olmalı, 2024-26 doğrulama döneminde de aynı yönde
+  tekrarlamalı.
+- **Stil grupları:** Takım-sezon profillerine K-Means uygulanır. Gruplar StatsBomb
+  2015/16 metrikleriyle yorumlanır.
+
+Arayüzde **Eşleşme** sayfası. Sonuçlar `pipelines/build_matchup.py` çıktısında ve CI
+özetinde.
+
 ## Keşifsel analiz (EDA)
 
 `notebooks/01_eda.ipynb` gol, korner, ev avantajı ve bahis piyasası analizini içerir.
@@ -85,6 +130,7 @@ Erişimin olan bir ağdaysan hattı yerelde de çalıştırabilirsin:
 | Kaynak | Kullanım | Not |
 | --- | --- | --- |
 | [football-data.co.uk](https://www.football-data.co.uk/data.php) | Sonuç, şut, korner, kart, bahis oranları | "Yalnızca maç tahmini amaçlı" kullanım koşulu |
+| [StatsBomb Open Data](https://github.com/statsbomb/open-data) | 2015/16 olay verisi (taktik metrikler) | Kaynak gösterilmeli; Süper Lig yok |
 
 Ham veri repoya eklenmez. Pipeline ile herkes kendi kopyasını indirir.
 
