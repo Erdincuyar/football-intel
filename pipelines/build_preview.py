@@ -43,11 +43,9 @@ def main() -> None:
 
     parts = []
     for league in LEAGUES:
-        if league not in OF.CODES:
-            log.info("%s: acik fikstur kaynagi yok, on tahmin N/A", LEAGUES[league].name)
-            continue
-        matches = OF.download(league)
+        matches = OF.download_any(league)
         if not matches:
+            log.info("%s: acik fikstur bulunamadi, on tahmin N/A", LEAGUES[league].name)
             continue
         rnd = P.next_round(matches, today)
         c = cur[cur["league"] == league]

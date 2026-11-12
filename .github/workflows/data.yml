@@ -106,11 +106,7 @@ jobs:
           uv run python pipelines/predict_upcoming.py
           ${{ github.event_name == 'pull_request' && '--dry-run' || '' }}
 
-      - name: "GECICI: Super Lig fikstur kaynaklarini dene"
-        continue-on-error: true
-        run: uv run python pipelines/probe_t1_fixtures.py
-
-      - name: "On tahmin: her ligin bir sonraki haftasi (openfootball fiksturu)"
+      - name: "On tahmin: her ligin bir sonraki haftasi (openfootball + fixturedownload)"
         run: uv run python pipelines/build_preview.py
 
       - name: Tahmin defterini degerlendir

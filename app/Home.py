@@ -60,9 +60,9 @@ def show_preview() -> None:
             "Tarih": st.column_config.DateColumn("Tarih"),
             "Korner beklentisi": st.column_config.NumberColumn(format="%.1f")})
     st.caption("On tahmin: ayni model, bugune kadarki sonuclarla. Fikstur kaynagi openfootball "
-               "(acik veri). Resmi tahmin, mac football-data fikstur listesine girince "
-               "degistirilemez deftere yazilir ve basarisi olculur; on tahmin olculmez, her "
-               "gun yenilenir. Super Lig icin acik fikstur kaynagi yok (N/A).")
+               "ve fixturedownload (Super Lig), ikisi de acik ve ucretsiz. Resmi tahmin, mac "
+               "football-data fikstur listesine girince degistirilemez deftere yazilir ve "
+               "basarisi olculur; on tahmin olculmez, her gun yenilenir.")
 
 
 led = load_ledger()

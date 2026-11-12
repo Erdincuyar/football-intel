@@ -58,3 +58,19 @@ def test_prediction_rows_marks_official_and_probabilities():
     s = out[["p_home", "p_draw", "p_away"]].sum(axis=1)
     assert ((s - 1).abs() < 1e-6).all()
     assert out["pred_score"].str.match(r"^\d+-\d+$").all()
+
+
+def test_fixturedownload_is_converted_to_openfootball_shape():
+    rows = [{"RoundNumber": 13, "DateUtc": "2026-11-22 16:00:00Z", "HomeTeam": "Galatasaray",
+             "AwayTeam": "Çaykur Rizespor", "HomeTeamScore": None, "AwayTeamScore": None},
+            {"RoundNumber": 12, "DateUtc": "2026-11-08 13:30:00Z", "HomeTeam": "Rizespor",
+             "AwayTeam": "Galatasaray", "HomeTeamScore": 0, "AwayTeamScore": 2}]
+    m = OF.from_fixturedownload(rows)
+    assert m[0] == {"round": "Hafta 13", "date": "2026-11-22", "time": "16:00 UTC",
+                    "team1": "Galatasaray", "team2": "Çaykur Rizespor"}
+    assert m[1]["score"] == {"ft": [0, 2]}
+    rnd = P.next_round(m, pd.Timestamp("2026-11-12"))
+    fx, unmatched = P.to_fixtures(rnd, "T1", "2627",
+                                  {"galatasaray": "Galatasaray", "rizespor": "Rizespor"},
+                                  aliases={})
+    assert unmatched == [] and fx["match_key"].tolist() == ["T1-2627-galatasaray-rizespor"]
