@@ -25,10 +25,10 @@ st.caption("Her tahmin, mactan once yalnizca o haftaya kadarki verilerle uretild
 def load():
     return (store.read_table("historical_predictions"),
             store.read_table("prediction_evaluation"),
-            store.read_table("evaluation_summary"))
+            store.read_table("evaluation_summary"), store.read_json("halftime_eval"))
 
 
-preds, ev, summary = load()
+preds, ev, summary, ht_eval = load()
 if preds is None or preds.empty:
     st.info("Gecmis tahmin tablosu henuz yok. CI'daki 'build_history' adimi uretir.")
     st.stop()
@@ -83,5 +83,8 @@ st.caption("✓ dogru · ✗ yanlis · – degerlendirilemedi (veri yok ya da ma
            "Sayilarda model beklentisi yarim yukari yuvarlanir; 'Tam' birebir, '±1' bir "
            "fark toleransli isabettir. Kirmizi kart olasiligi lig oranina yakin oldugu icin "
            "neredeyse hep 'Yok' der; anlamli olcusu Brier skorudur. Ilk golu atan takim icin "
-           "veri kaynagimizda dakika bilgisi yok (N/A). Rozetler logo degil, isimden "
-           "uretilen kisaltmadir.")
+           "veri kaynagimizda dakika bilgisi yok (N/A); yerine ilk yari sonucu tahmini "
+           "gosteriliyor. Rozetler logo degil, isimden uretilen kisaltmadir.")
+if ht_eval and not ht_eval.get("gate_passed"):
+    st.caption("Ilk yari sonucu: dusuk guven. Test sezonlarinda model, ligin ilk yari "
+               "frekansindan anlamli olarak daha iyi cikmadi (Brier).")

@@ -43,7 +43,7 @@ APP_TABLES = ["matches_football_data", "backtest_predictions", "style_profile",
               "match_results", "prediction_evaluation", "evaluation_summary",
               "evaluation_metrics"]
 APP_JSON = ["tactics_proxy", "tactics_summary", "xt_grid", "matchup_rules",
-            "style_thresholds", "style_clusters"]
+            "style_thresholds", "style_clusters", "cards_eval", "halftime_eval"]
 
 
 def clean_url(raw: str) -> str:
@@ -209,6 +209,11 @@ def append_immutable(url: str, name: str, df: pd.DataFrame, key: list[str]) -> i
         cur.execute(f"CREATE SCHEMA IF NOT EXISTS {SCHEMA}")
         cur.execute(sql.SQL("CREATE TABLE IF NOT EXISTS {} ({}, PRIMARY KEY ({}))").format(
             ident, cols, sql.SQL(", ").join(sql.Identifier(k) for k in key)))
+        # Yeni model surumu yeni kolon getirebilir (or. ilk yari olasiliklari). Eski satirlar
+        # degismez; yalnizca tabloya bos (NULL) kolon eklenir.
+        for c in df.columns:
+            cur.execute(sql.SQL("ALTER TABLE {} ADD COLUMN IF NOT EXISTS {} {}").format(
+                ident, sql.Identifier(str(c)), sql.SQL(pg_type(df[c]))))
         cur.execute(sql.SQL("CREATE TEMP TABLE {} ({}) ON COMMIT DROP").format(stage, cols))
         with cur.copy(sql.SQL("COPY {} ({}) FROM STDIN").format(stage, names)) as cp:
             for row in df.itertuples(index=False, name=None):
