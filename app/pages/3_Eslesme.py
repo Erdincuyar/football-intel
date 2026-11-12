@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-import json
+# Streamlit Cloud paketi kurmadan calistirir; src/ klasorunu yola ekliyoruz.
+import sys  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import numpy as np
 import pandas as pd
 import streamlit as st
 
+from footintel import store
 from footintel.analysis import rules as R
-from footintel.config import CLEAN_DIR, LEAGUES
+from footintel.config import LEAGUES
 from footintel.features import style as ST
 
 st.set_page_config(page_title="Taktiksel Eslesme", layout="wide")
@@ -29,16 +34,20 @@ TARGET_TR = {"res_goals": "gol", "res_goals_against": "yenilen gol", "res_corner
              "res_fouls": "faul", "res_yellows": "sari kart"}
 
 
+@st.cache_data(ttl=3600)
 def load_json(name: str):
-    p = CLEAN_DIR / name
-    return json.loads(p.read_text()) if p.exists() else None
+    return store.read_json(name.removesuffix(".json"))
 
 
-path = CLEAN_DIR / "style_now.parquet"
-if not path.exists():
+@st.cache_data(ttl=3600)
+def load_table(name: str) -> pd.DataFrame | None:
+    return store.read_table(name)
+
+
+now = load_table("style_now")
+if now is None:
     st.info("Profil verisi yok. CI'daki build_matchup adimi uretir.")
     st.stop()
-now = pd.read_parquet(path)
 results = pd.DataFrame(load_json("matchup_rules.json") or [])
 th_all = load_json("style_thresholds.json") or {}
 

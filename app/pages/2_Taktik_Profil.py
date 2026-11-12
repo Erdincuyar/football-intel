@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-import json
+# Streamlit Cloud paketi kurmadan calistirir; src/ klasorunu yola ekliyoruz.
+import sys  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import altair as alt
 import pandas as pd
 import streamlit as st
 
-from footintel.config import CLEAN_DIR, LEAGUES, season_label
+from footintel import store
+from footintel.config import LEAGUES, season_label
 
 st.set_page_config(page_title="Taktik Profil", layout="wide")
 st.title("Taktik Profil")
@@ -25,9 +30,14 @@ LABELS = {
 }
 
 
+@st.cache_data(ttl=3600)
 def load_json(name: str):
-    path = CLEAN_DIR / name
-    return json.loads(path.read_text()) if path.exists() else None
+    return store.read_json(name.removesuffix(".json"))
+
+
+@st.cache_data(ttl=3600)
+def load_table(name: str) -> pd.DataFrame | None:
+    return store.read_table(name)
 
 
 tab_now, tab_sb = st.tabs(["Guncel stil profili", "StatsBomb 2015/16"])
@@ -39,11 +49,10 @@ with tab_now:
         "modelle hesaplanir. Model StatsBomb 2015/16'da egitildi ve her seferinde bir ligi "
         "disarida birakarak test edildi; hata payi asagida."
     )
-    path = CLEAN_DIR / "style_profile.parquet"
-    if not path.exists():
+    prof = load_table("style_profile")
+    if prof is None:
         st.info("Stil profili henuz yok. CI'daki build_tactics adimi uretir.")
     else:
-        prof = pd.read_parquet(path)
         c1, c2 = st.columns(2)
         lg_names = {LEAGUES[k].name: k for k in sorted(prof["league"].unique()) if k in LEAGUES}
         lg = lg_names[c1.selectbox("Lig", list(lg_names))]
@@ -78,11 +87,10 @@ with tab_sb:
         "Ligue 1). Her pas, pres ve sutun sahadaki konumundan hesaplandi. "
         "Data: StatsBomb (github.com/statsbomb/open-data)."
     )
-    path = CLEAN_DIR / "tactics_team_match_1516.parquet"
-    if not path.exists():
+    tm = load_table("tactics_team_match_1516")
+    if tm is None:
         st.info("StatsBomb metrikleri henuz yok. CI'daki build_tactics adimi uretir.")
     else:
-        tm = pd.read_parquet(path)
         metrics = ["pass_share", "ppda", "def_height", "high_press_share", "field_tilt",
                    "xg_share", "xt_share", "long_share", "cross_share", "npxg_per_shot",
                    "pass_completion", "points"]
