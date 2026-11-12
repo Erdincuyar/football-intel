@@ -43,6 +43,41 @@ APP_JSON = ["tactics_proxy", "tactics_summary", "xt_grid", "matchup_rules",
             "style_thresholds", "style_clusters"]
 
 
+def clean_url(raw: str) -> str:
+    """Kopyalama sirasinda sik gelen bozulmalari temizler.
+
+    Neon'un baglanti kutusu bazen `psql 'postgresql://...'` biciminde kopyalanir; secrets
+    kutusuna yapistirirken tirnak, bosluk veya satir sonu da eklenebilir. Bunlar adresin
+    parcasi degildir.
+    """
+    url = raw.strip()
+    if url.lower().startswith("psql "):
+        url = url[5:].strip()
+    while len(url) >= 2 and url[0] == url[-1] and url[0] in "'\"":
+        url = url[1:-1].strip()
+    return "".join(url.split())                 # adreste bosluk/satir sonu olamaz
+
+
+def describe_url(url: str) -> str:
+    """Adresi YAZDIRMADAN neyin yanlis olabilecegini soyler (sifre ve sunucu gizli kalir)."""
+    from urllib.parse import urlsplit
+
+    if not url.startswith(("postgresql://", "postgres://")):
+        return "adres 'postgresql://' ile baslamiyor"
+    try:
+        host = urlsplit(url).hostname or ""
+    except ValueError:
+        return "adres ayrisitirilamadi"
+    if not host:
+        return "adreste sunucu adi yok"
+    labels = host.split(".")
+    if any(not lb or len(lb) > 63 for lb in labels):
+        return f"sunucu adi bozuk ({len(labels)} parca, bos ya da 63 karakterden uzun parca var)"
+    if not host.endswith("neon.tech"):
+        return "sunucu adi neon.tech ile bitmiyor"
+    return "adres bicimi dogru gorunuyor"
+
+
 def database_url() -> str | None:
     """Baglanti adresi: once ortam degiskeni (CI), sonra Streamlit secrets (Cloud).
     Gizli bilgi hicbir zaman koda veya repoya yazilmaz."""
@@ -54,7 +89,7 @@ def database_url() -> str | None:
             url = str(st.secrets.get(ENV_VAR, "")).strip()
         except Exception:                       # streamlit yok veya secrets dosyasi yok
             url = ""
-    return url or None
+    return clean_url(url) or None
 
 
 def _connect(url: str):
@@ -174,7 +209,8 @@ def read_table(name: str, url: str | None = None) -> pd.DataFrame | None:
                                                                       np.nan)
                 return df
         except Exception as exc:  # baglanti veya tablo yoksa dosyaya dus
-            log.warning("Veritabanindan %s okunamadi (%s); dosyaya bakiliyor", name, exc)
+            log.warning("Veritabanindan %s okunamadi (%s; %s); dosyaya bakiliyor", name,
+                        type(exc).__name__, describe_url(url))
     p = cfg.CLEAN_DIR / f"{name}.parquet"
     return pd.read_parquet(p) if p.exists() else None
 
@@ -189,7 +225,8 @@ def read_json(name: str, url: str | None = None):
                 if row is not None:
                     return json.loads(row[0])
         except Exception as exc:
-            log.warning("Veritabanindan %s okunamadi (%s); dosyaya bakiliyor", name, exc)
+            log.warning("Veritabanindan %s okunamadi (%s; %s); dosyaya bakiliyor", name,
+                        type(exc).__name__, describe_url(url))
     p = cfg.CLEAN_DIR / f"{name}.json"
     return json.loads(p.read_text()) if p.exists() else None
 

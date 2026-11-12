@@ -84,3 +84,22 @@ def test_publish_and_read_roundtrip(tmp_path, monkeypatch):
     d.iloc[:1].to_parquet(clean / "style_now.parquet")
     store.publish(TEST_URL, clean, led)
     assert len(store.read_table("style_now", url=TEST_URL)) == 1
+
+
+@pytest.mark.parametrize("raw", [
+    "postgresql://u:p@ep-x.us-east-1.aws.neon.tech/db?sslmode=require",
+    "  psql 'postgresql://u:p@ep-x.us-east-1.aws.neon.tech/db?sslmode=require'\n",
+    "\"postgresql://u:p@ep-x.us-east-1.aws.neon.tech/db?sslmode=require\"",
+    "postgresql://u:p@ep-x.us-east-1.aws.\nneon.tech/db?sslmode=require",
+])
+def test_clean_url_fixes_copy_paste(raw):
+    url = store.clean_url(raw)
+    assert url == "postgresql://u:p@ep-x.us-east-1.aws.neon.tech/db?sslmode=require"
+    assert store.describe_url(url) == "adres bicimi dogru gorunuyor"
+
+
+def test_describe_url_never_prints_secret():
+    bad = "postgresql://u:gizli@ep-x..neon.tech/db"
+    msg = store.describe_url(bad)
+    assert "bozuk" in msg and "gizli" not in msg and "ep-x" not in msg
+    assert "baslamiyor" in store.describe_url("neondb_owner:gizli@host")
