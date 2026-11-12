@@ -125,8 +125,13 @@ CREATE TABLE IF NOT EXISTS backtest_prediction (
     exp_corners         DOUBLE, exp_home_corners DOUBLE, exp_away_corners DOUBLE,
     p_corners_over85    DOUBLE, p_corners_over95 DOUBLE,
     p_corners_over105   DOUBLE, p_corners_over115 DOUBLE,
-    ll_corners          DOUBLE    -- log P(gerceklesen toplam korner)
+    ll_corners          DOUBLE,   -- log P(gerceklesen toplam korner)
+    pred_score          VARCHAR,  -- Faz 9: en olasi skor ("1-0")
+    p_pred_score        DOUBLE
 );
+-- Eski yerel veritabanlari icin (CREATE IF NOT EXISTS mevcut tabloya kolon eklemez)
+ALTER TABLE backtest_prediction ADD COLUMN IF NOT EXISTS pred_score VARCHAR;
+ALTER TABLE backtest_prediction ADD COLUMN IF NOT EXISTS p_pred_score DOUBLE;
 
 -- Faz 4 ----------------------------------------------------------------------
 
