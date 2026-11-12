@@ -134,7 +134,8 @@ def card_html(m: pd.Series) -> str:
     side = []
     for team in (m["home_team"], m["away_team"]):
         abbr, color = badge(team)
-        side.append(f'<span class="fi-badge" style="background:{color}" title="{e(team)}">{e(abbr)}</span>'
+        side.append(f'<span class="fi-badge" style="background:{color}" '
+                    f'title="{e(team)}">{e(abbr)}</span>'
                     f'<span class="fi-team">{e(team)}</span>')
     body = "".join(
         f"<tr><td>{e(r['label'])}</td><td>{e(r['pred'])}</td><td>{e(r['actual'])}</td>"
