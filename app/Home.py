@@ -22,7 +22,7 @@ from footintel.config import LEAGUES, LEDGER_DIR
 st.set_page_config(page_title="Football Intelligence", layout="wide")
 st.title("Football Intelligence Platform")
 st.caption(
-    "Premier League, La Liga, Super Lig, Serie A ve Ligue 1 icin mac olasiliklari. "
+    "Premier League, La Liga, Bundesliga, Super Lig, Serie A ve Ligue 1 icin mac olasiliklari. "
     "Tahminler mactan once degistirilemez deftere yazilir; sonuclar Model Performansi "
     "sayfasinda olculur. Bu bir portfoy projesidir, bahis tavsiyesi degildir."
 )
