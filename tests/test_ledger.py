@@ -28,8 +28,10 @@ def fake_predictions(fx):
     out = {}
     for r in fx.itertuples():
         m = S.score_matrix(model, r.home_team_id, r.away_team_id)
-        out[r.match_key] = (S.goal_markets(m), m,
-                            S.corner_markets(cmodel, r.home_team_id, r.away_team_id))
+        corners = S.corner_markets(cmodel, r.home_team_id, r.away_team_id)
+        corners |= {f"p_{side}_corners_over{line}": 0.5 for side in ("home", "away")
+                    for line in ("35", "45", "55")}
+        out[r.match_key] = (S.goal_markets(m), m, corners)
     return out
 
 
@@ -111,6 +113,7 @@ def test_evaluate_outcomes(fixtures):
     assert got[("btts", "yes")] == 1
     assert got[("correct_score", "2-1")] == 1 and got[("correct_score", "1-1")] == 0
     assert got[("corners_ou105", "over")] == 1 and got[("corners_ou115", "over")] == 0
+    assert got[("home_corners_ou55", "over")] == 1 and got[("away_corners_ou55", "over")] == 0
     assert got[("away_goals_ou05", "over")] == 1 and got[("away_goals_ou15", "over")] == 0
     assert (ev["league"] == "E0").all()   # T1 maci oynanmadi: degerlendirmede yok
     summary = ledger.market_summary(rows, ledger.evaluate(rows, results)).set_index("market")
