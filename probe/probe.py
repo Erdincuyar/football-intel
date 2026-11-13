@@ -1,5 +1,5 @@
-"""GECICI Faz 11 kaynak denemesi: erisim, kapsam ve icerik ozeti (yalnizca okuma, az istek)."""
-import json, re, sys, time
+"""GECICI Faz 11 kaynak denemesi, tur 2: Understat yeni bicim, FotMob mac detayi icerigi."""
+import json, re
 import requests
 
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -7,49 +7,55 @@ UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.3
 
 def get(url, **kw):
     try:
-        r = requests.get(url, headers=UA | kw.pop("headers", {}), timeout=25, **kw)
-        return r
+        return requests.get(url, headers=UA | kw.pop("headers", {}), timeout=25, **kw)
     except Exception as e:
-        print("  HATA", url, type(e).__name__, str(e)[:120]); return None
+        print("  HATA", url, type(e).__name__); return None
 
-def show(name, r, n=300):
-    if r is None: return
-    print(f"\n== {name}: {r.status_code} {r.headers.get('content-type','')[:40]} {len(r.content)}B")
-    print("  ", r.text[:n].replace("\n", " "))
+def keys(o, depth=0, maxd=2, pre=""):
+    if depth > maxd: return
+    if isinstance(o, dict):
+        for k, v in list(o.items())[:40]:
+            t = type(v).__name__ + (f"[{len(v)}]" if isinstance(v, (list, dict)) else "")
+            print("   " * depth + f"{pre}{k}: {t}")
+            keys(v, depth + 1, maxd)
+    elif isinstance(o, list) and o:
+        keys(o[0], depth, maxd, pre="[0].")
 
-# 1 Understat
-r = get("https://understat.com/league/EPL/2026"); show("understat league", r, 200)
-if r is not None and r.ok: print("  has teamsData:", "teamsData" in r.text, "maintenance" in r.text.lower())
+# Understat
+r = get("https://understat.com/league/EPL/2026")
+print("understat scripts:", re.findall(r'<script[^>]*src="([^"]+)"', r.text)[:10] if r else None)
+print("understat JSON.parse:", r.text.count("JSON.parse") if r else None)
+for u in ["https://understat.com/getLeagueData/EPL/2026", "https://understat.com/getLeagueData/EPL/2025"]:
+    rr = get(u, headers={"X-Requested-With": "XMLHttpRequest", "Referer": "https://understat.com/league/EPL"})
+    print("\n==", u, rr.status_code if rr is not None else None, rr.headers.get("content-type") if rr is not None else "")
+    if rr is not None and rr.ok:
+        try:
+            d = rr.json(); keys(d, maxd=1)
+            dates = d.get("dates") or []
+            print("  maclar:", len(dates), dates[0] if dates else None)
+        except Exception as e:
+            print("  json degil", rr.text[:200])
 
-# 2 FotMob
-for u in ["https://www.fotmob.com/api/leagues?id=47&ccode3=TUR",
-          "https://www.fotmob.com/api/data/leagues?id=71",
-          "https://www.fotmob.com/api/matchDetails?matchId=4813374"]:
-    r = get(u); show("fotmob " + u.split("/api/")[1][:30], r, 200)
-r = get("https://www.fotmob.com/leagues/71/overview/super-lig"); show("fotmob html super lig", r, 150)
-if r is not None and r.ok:
-    m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', r.text, re.S)
-    print("  NEXT_DATA:", bool(m), len(m.group(1)) if m else 0)
-    if m:
-        d = json.loads(m.group(1)); s = json.dumps(d)
-        for k in ("expected_goals", "xg", "injur", "unavailable", "coach", "lineup"):
-            print("   ", k, s.lower().count(k))
-
-# 3 Transfermarkt injuries (Super Lig = TR1)
-r = get("https://www.transfermarkt.com/super-lig/verletztespieler/wettbewerb/TR1"); show("transfermarkt TR1 injuries", r, 150)
-if r is not None and r.ok: print("  rows ~", r.text.count('class="odd"') + r.text.count('class="even"'))
-r = get("https://www.transfermarkt.com/robots.txt"); show("transfermarkt robots", r, 600)
-
-# 4 Wikipedia managerial changes (CC BY-SA)
-for t in ["2025–26 Premier League", "2025–26 Süper Lig", "2026–27 Premier League"]:
-    r = get("https://en.wikipedia.org/w/api.php", params={"action": "parse", "page": t,
-            "prop": "sections", "format": "json"})
-    if r is not None and r.ok:
-        secs = [s["line"] for s in r.json().get("parse", {}).get("sections", [])]
-        print("\n== wikipedia", t, "| managerial section:", [s for s in secs if "anager" in s or "oach" in s])
-
-# 5 ClubElo, football-data.org (no key)
-show("clubelo", get("http://api.clubelo.com/2026-11-13"), 120)
-show("football-data.org (anahtarsiz)", get("https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED"), 200)
-# 6 Sofascore
-show("sofascore", get("https://api.sofascore.com/api/v1/unique-tournament/52/seasons"), 200)
+# FotMob: Super Lig (71) lig verisi -> bitmis bir mac id -> mac detayi
+lg = get("https://www.fotmob.com/api/data/leagues?id=71").json()
+print("\n== fotmob league keys"); keys(lg, maxd=0)
+fx = lg.get("fixtures", {}).get("allMatches") or lg.get("matches", {}).get("allMatches") or []
+done = [m for m in fx if m.get("status", {}).get("finished")]
+nxt = [m for m in fx if not m.get("status", {}).get("finished")]
+print("  bitmis:", len(done), "gelecek:", len(nxt))
+for label, m in (("bitmis", done[-1] if done else None), ("gelecek", nxt[0] if nxt else None)):
+    if not m: continue
+    mid = m["id"]
+    for u in [f"https://www.fotmob.com/api/data/matchDetails?matchId={mid}",
+              f"https://www.fotmob.com/api/matchDetails?matchId={mid}"]:
+        rr = get(u)
+        print(f"\n== {label} {m.get('home',{}).get('name')}-{m.get('away',{}).get('name')} {u.split('/api/')[1][:25]}:",
+              rr.status_code if rr is not None else None, len(rr.content) if rr is not None else 0)
+        if rr is not None and rr.ok and rr.content:
+            d = rr.json(); keys(d, maxd=1)
+            s = json.dumps(d).lower()
+            for k in ("expected_goals", "unavailable", "injur", "suspen", "coach", "lineup", "predicted"):
+                print("    ", k, s.count(k))
+            lu = d.get("content", {}).get("lineup")
+            if lu: print("  lineup keys:"); keys(lu, maxd=2)
+            break
