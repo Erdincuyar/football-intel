@@ -1,0 +1,41 @@
+# GECICI (Faz 11 arastirma): FotMob gecmis sezonlarini toplar, lab/fotmob-data dalina yazar.
+name: lab-fotmob
+on:
+  push:
+    branches: ["lab/fotmob-backfill"]
+permissions:
+  contents: write
+jobs:
+  season:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        season: ["2223", "2324", "2425", "2526", "2627"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: uv run python pipelines/ingest_fotmob.py --seasons ${{ matrix.season }} --budget 2600
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fm-${{ matrix.season }}
+          path: data/reference/fotmob/
+  collect:
+    needs: season
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Ayri dala yaz
+        run: |
+          cd out && ls -la
+          git init -q -b lab/fotmob-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898099+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -qm "FotMob gecmis sezonlar"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" lab/fotmob-data
