@@ -39,7 +39,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     services:
       # Faz 8: veri katmaninin Postgres testleri icin gecici bir veritabani (yalnizca test).
       postgres:
@@ -111,6 +111,23 @@ jobs:
 
       - name: "On tahmin: her ligin bir sonraki haftasi (openfootball + fixturedownload)"
         run: uv run python pipelines/build_preview.py
+
+      # Faz 11: FotMob (resmi olmayan kaynak). Biten maclar onbellekte tutulur, her
+      # calismada yalnizca yeni maclar ve yaklasan maclarin sakat/cezali listesi indirilir.
+      # Kaynak cevap vermezse hat durmaz; yazilar FotMob bilgisi olmadan uretilir.
+      - name: FotMob onbellegi
+        uses: actions/cache@v4
+        with:
+          path: data/raw/fotmob
+          key: fotmob-${{ github.run_id }}
+          restore-keys: fotmob-
+
+      - name: "Faz 11: FotMob (xG, kadro, sakat/cezali)"
+        continue-on-error: true
+        run: uv run python pipelines/ingest_fotmob.py --budget 800
+
+      - name: "Faz 11: tahmin yazilari ve haftanin kuponu"
+        run: uv run python pipelines/build_insights.py
 
       - name: Tahmin defterini degerlendir
         run: uv run python pipelines/evaluate_ledger.py
