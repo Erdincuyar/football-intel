@@ -51,6 +51,7 @@ def main() -> None:
             if season == CURRENT_SEASON and not up.empty:
                 upcoming.append(up.assign(league=league))
     if upcoming:
+        CLEAN_DIR.mkdir(parents=True, exist_ok=True)
         pd.concat(upcoming, ignore_index=True).to_parquet(
             CLEAN_DIR / "fotmob_upcoming.parquet", index=False)
     log.info("FotMob: %d istek kullanildi", args.budget - left)
