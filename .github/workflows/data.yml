@@ -89,6 +89,9 @@ jobs:
       - name: "Faz 5: korner regresyonu (ozellik secimi, test, kapi)"
         run: uv run python pipelines/build_corners.py
 
+      - name: "Faz 10: 1X2 sonuc modeli (DC + piyasa reytingi, walk-forward kapi)"
+        run: uv run python pipelines/build_outcome.py
+
       - name: "Faz 9: kart verisi kapsami ve kart modeli"
         run: uv run python pipelines/build_cards.py
 

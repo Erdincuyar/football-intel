@@ -84,9 +84,17 @@ def data_dir(tmp_path, monkeypatch):
     return tmp_path
 
 
-@pytest.mark.parametrize("page", ["Home.py", "pages/1_Model_Performance.py",
-                                  "pages/2_Taktik_Profil.py", "pages/3_Eslesme.py",
-                                  "pages/4_Mac_Merkezi.py", "pages/5_Performans_Paneli.py"])
+PAGES = ["Home.py", "pages/1_Mac_Merkezi.py", "pages/2_Performans.py", "pages/3_Taktik.py"]
+
+
+def test_page_set_is_consolidated():
+    # Faz 10: 6 sayfa 4'e indi; tekrar eden sayfalar geri gelmesin.
+    found = sorted(str(p.relative_to(APP)) for p in [APP / "Home.py",
+                                                      *(APP / "pages").glob("*.py")])
+    assert found == sorted(PAGES)
+
+
+@pytest.mark.parametrize("page", PAGES)
 def test_page_runs(data_dir, page):
     at = AppTest.from_file(str(APP / page), default_timeout=60).run()
     assert not at.exception, at.exception
@@ -107,7 +115,7 @@ def test_home_without_upcoming_matches(data_dir, monkeypatch):
     st.cache_data.clear()                  # onceki testin defteri onbellekte kalmasin
     at = AppTest.from_file(str(APP / "Home.py"), default_timeout=60).run()
     assert not at.exception, at.exception
-    assert any("yaklasan mac yok" in i.value for i in at.info)
+    assert any("yaklasan mac yok" in i.value.lower() for i in at.info)
 
     # Milli mac arasinda on tahmin tablosu yine gorunur; resmi defterdekiler tekrar edilmez
     from footintel.analysis import preview as P
@@ -121,8 +129,9 @@ def test_home_without_upcoming_matches(data_dir, monkeypatch):
     st.cache_data.clear()
     at = AppTest.from_file(str(APP / "Home.py"), default_timeout=60).run()
     assert not at.exception, at.exception
-    assert any("on tahmin (1 mac)" in h.value for h in at.subheader)
+    assert any("Maclar (1)" in h.value for h in at.subheader)
     assert len(at.dataframe[0].value) == 1
+    assert at.dataframe[0].value["Durum"].iloc[0] == "On tahmin"
 
 
 def test_match_center_with_history(data_dir):
@@ -142,17 +151,17 @@ def test_match_center_with_history(data_dir):
         scope="week").to_parquet(clean / "evaluation_summary.parquet")
     import streamlit as st
     st.cache_data.clear()
-    at = AppTest.from_file(str(APP / "pages/4_Mac_Merkezi.py"), default_timeout=60).run()
+    at = AppTest.from_file(str(APP / "pages/1_Mac_Merkezi.py"), default_timeout=60).run()
     assert not at.exception, at.exception
     assert len(at.metric) == 6 and at.metric[0].value.startswith("%")
     cards = [m.value for m in at.markdown if m.value.startswith("<div class=\"fi-card")]
     assert len(cards) == 3                                    # son haftanin 3 maci
     assert "N/A" in cards[0]                                  # kart modeli yok -> N/A
 
-    # Performans Paneli ayni veriyle
+    # Performans ayni veriyle: 7 isabet KPI'si + log loss KPI'si, ilk ekranda tek tablo
     st.cache_data.clear()
-    at = AppTest.from_file(str(APP / "pages/5_Performans_Paneli.py"), default_timeout=60).run()
+    at = AppTest.from_file(str(APP / "pages/2_Performans.py"), default_timeout=60).run()
     assert not at.exception, at.exception
-    assert len(at.metric) == 7 and at.metric[0].value.startswith("%")
+    assert len(at.metric) == 8 and at.metric[0].value.startswith("%")
     assert at.metric[1].value == "N/A"                         # ilk yari modeli yok
-    assert len(at.dataframe) == 2
+    assert at.dataframe[0].value["Tahmin"].iloc[0] == "Mac sonucu (1X2)"

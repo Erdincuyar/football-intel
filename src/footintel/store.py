@@ -43,7 +43,8 @@ APP_TABLES = ["matches_football_data", "backtest_predictions", "style_profile",
               "match_results", "prediction_evaluation", "evaluation_summary",
               "evaluation_metrics", "preview_predictions"]
 APP_JSON = ["tactics_proxy", "tactics_summary", "xt_grid", "matchup_rules",
-            "style_thresholds", "style_clusters", "cards_eval", "halftime_eval"]
+            "style_thresholds", "style_clusters", "cards_eval", "halftime_eval",
+            "outcome_eval"]
 
 
 def clean_url(raw: str) -> str:

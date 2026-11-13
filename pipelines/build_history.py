@@ -4,6 +4,9 @@ Sezonlar: 2025/26 ve 2026/27. Neden daha eskisi degil? Gol modelinin ayarlari 20
 kart modelininki 2023/24'te secildi. Bu sezonlari "gecmis tahmin" diye gostermek, ayarlarin
 o sezonu gormus olmasi yuzunden hafif bir sizinti olurdu. 2025/26'dan itibaren temiz.
 
+Faz 10'dan itibaren (hist-v3) 1X2 olasiliklari build_outcome.py'nin walk-forward
+tablosundan gelir (dc-mr-v3; ayar secimi 2023/24'te yapildi).
+
 Yazma: data/clean/historical_predictions.parquet (uygulama yedegi) ve, adres varsa, Neon'daki
 app.historical_predictions (anahtar: match_id + model_version, yalnizca ekleme).
 
@@ -39,8 +42,11 @@ def main() -> None:
     cards = pd.read_parquet(cards_path) if cards_path.exists() else None
     ht_path = CLEAN_DIR / "halftime_backtest.parquet"
     halftime = pd.read_parquet(ht_path) if ht_path.exists() else None
+    oc_path = CLEAN_DIR / "outcome_backtest.parquet"
+    outcome = pd.read_parquet(oc_path) if oc_path.exists() else None
     fd = fd[fd["season"].isin(SEASONS)]
-    hist = H.assemble(fd, bt, cards, pd.Timestamp.now(tz="UTC"), halftime=halftime)
+    hist = H.assemble(fd, bt, cards, pd.Timestamp.now(tz="UTC"), halftime=halftime,
+                      outcome=outcome)
     hist.to_parquet(CLEAN_DIR / "historical_predictions.parquet", index=False)
     log.info("Gecmis tahmin: %d mac (%s)", len(hist),
              hist.groupby(["league", "season"]).size().to_dict())
