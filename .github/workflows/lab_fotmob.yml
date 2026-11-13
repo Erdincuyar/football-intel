@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        season: ["2223", "2324", "2425", "2526", "2627"]
+        season: ["2627"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -27,6 +27,7 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
+      - run: git clone -q -b lab/fotmob-data --depth 1 "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" out && rm -rf out/.git
       - uses: actions/download-artifact@v4
         with:
           path: out
