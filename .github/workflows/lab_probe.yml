@@ -1,8 +1,9 @@
-# GECICI (Faz 11 arastirma): ucretsiz veri kaynaklarina CI'dan erisimi dener. Birlestirilmez.
+# GECICI (Faz 11 arastirma): API-Football ucretsiz plan erisimini dener. Birlestirilmez.
 name: lab-probe
 on:
   push:
     branches: ["lab/probe-sources"]
+  workflow_dispatch: {}
 permissions:
   contents: read
 jobs:
@@ -14,3 +15,5 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked
       - run: uv run python probe/probe.py
+        env:
+          APIFOOTBALL_KEY: ${{ secrets.APIFOOTBALL_KEY }}
