@@ -78,7 +78,8 @@ def show_notes(notes: pd.DataFrame | None, keys: pd.Series) -> None:
         return
     st.subheader("Mac yorumlari")
     st.caption("Her yorum yalnizca veride olan sayilara dayanir: tahmin, en guclu iki neden ve "
-               "bir uyari. Kadro ve sakatlik bilgisi henuz yok.")
+               "bir uyari. Sakat ve cezali duzenli oyuncular FotMob'dan gelir; modelin "
+               "tahmininde yer almaz, uyari olarak yazilir.")
     cols = st.columns(2)
     for i, r in enumerate(n.itertuples(index=False)):
         with cols[i % 2].container(border=True):

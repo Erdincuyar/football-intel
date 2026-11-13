@@ -76,7 +76,7 @@ def _season(n_rounds: int = 8):
             m = {"fm_id": fm_id}
             for side, t in (("home", h), ("away", a)):
                 m |= {f"{side}_npxg": 1.0 + (t == 10), f"{side}_opp_half_passes": 100.0 + t,
-                      f"{side}_coach_id": 1 if (t != 20 or r < 5) else 2,
+                      f"{side}_coach_id": 1 if (t != 20 or r < 5 or r == 9) else 2,
                       f"{side}_xi_value": 1e8}
                 for k in range(11):
                     ps.append({"fm_id": fm_id, "team_fm_id": t, "player_id": t * 100 + k,
@@ -123,6 +123,8 @@ def test_new_coach_flag():
     assert t20["new_coach"].iloc[:5].isna().all()             # veri basi: bilinmiyor
     switch = t20.index[t20["coach"] == 2][0]
     assert t20.loc[switch, "new_coach"] == 1 and t20.loc[switch, "coach_games"] == 0
+    back = t20.index[t20["coach"] == 1][-1]                  # eski hoca bir mac geri dondu
+    assert t20.loc[back, "coach_games"] >= 5 and t20.loc[back, "new_coach"] == 0
 
 
 def test_team_map_links_by_date_and_score():
@@ -137,3 +139,27 @@ def test_team_map_links_by_date_and_score():
     assert tm == {v: k for k, v in names.items()}
     ln = FF.link(fd, fx)
     assert len(ln) == len(fx) and (ln["fm_id"].to_numpy() == fx["fm_id"].to_numpy()).all()
+
+
+def test_for_fixtures_links_upcoming_and_names_absentees():
+    fx, ms, ps = _season()
+    names = {10: "a", 20: "b", 30: "c", 40: "d"}
+    fd = pd.DataFrame({"match_id": [f"m{i}" for i in range(len(fx))], "league": "E0",
+                       "season": "2526", "match_date": fx["kickoff"].dt.normalize(),
+                       "home_team_id": fx["home_fm_id"].map(names),
+                       "away_team_id": fx["away_fm_id"].map(names),
+                       "home_goals": fx["fm_home_goals"], "away_goals": fx["fm_away_goals"]})
+    day = fx["kickoff"].max() + pd.Timedelta(days=7)
+    nxt = pd.DataFrame({"fm_id": [5000], "league": "E0", "season": "2526", "kickoff": [day],
+                        "home_fm_id": [10], "away_fm_id": [20], "finished": [False],
+                        "cancelled": [False], "fm_home_goals": np.nan, "fm_away_goals": np.nan})
+    up = pd.DataFrame({"fm_id": [5000, 5000], "team_fm_id": [10, 10],
+                       "player_id": [1003, 9999], "name": ["Yildiz", "Genc"],
+                       "role": "unavailable"})
+    fixtures = pd.DataFrame({"match_key": ["k"], "league": "E0", "match_date": [day.normalize()],
+                             "home_team_id": ["a"], "away_team_id": ["b"]})
+    out = FF.for_fixtures(fd, fixtures, pd.concat([fx, nxt], ignore_index=True), ms, ps, up)
+    r = out.set_index("match_key").loc["k"]
+    assert r["h_absent"] == "Yildiz" and r["h_n_absent"] == 1   # duzenli olmayan yazilmaz
+    assert r["h_missing"] == 0.1 and pd.isna(r["a_absent"])
+    assert r["h_xg_for"] > r["a_xg_for"]

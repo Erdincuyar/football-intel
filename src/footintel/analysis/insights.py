@@ -8,6 +8,10 @@ Neden adaylari (mac oncesi, sizintisiz; features/form.py ve features/market_rati
 - piyasa reytingi: takimin onceki maclarinda piyasanin ona bicitigi beklenen puan
 - son 6 mac puani, isabetli sut uretimi ve yenilen isabetli sut
 - ic saha / deplasman formu, dinlenme gunu farki
+- FotMob varsa: penaltisiz beklenen gol (npxG) formu
+Ucuncu satir: FotMob'un sakat/cezali listesinde takimin duzenli oyunculari varsa once o
+yazilir. Bu bilgi modelin icinde degildir (Faz 11 testinde canli kullanilabilir bicimi
+tahmini iyilestirmedi); okuyucuya uyari olarak verilir.
 Her aday, ayni ligdeki tum maclarin dagilimina gore standartlastirilir (z-skoru); tahmini
 destekleyen en guclu iki aday yazilir. Ucuncu satir her zaman bir uyaridir.
 
@@ -28,8 +32,10 @@ COUPON_SIZE = 3
 MAX_PER_LEAGUE = 2
 MIN_PROB = 0.60          # bunun altindaki secim kupona girmez; az aday varsa kupon kisa kalir
 # Bir nedenin yaziya girmesi icin en kucuk fark (kucuk farklar "neden" sayilmaz):
-# piyasa reytingi (beklenen puan), son 6 mac puani, mac basina isabetli sut.
-MIN_GAP = {"mr": 0.3, "pts": 3, "sot": 0.8}
+# piyasa reytingi (beklenen puan), son 6 mac puani, mac basina isabetli sut, npxG.
+MIN_GAP = {"mr": 0.3, "pts": 3, "sot": 0.8, "xg": 0.4}
+# Eksik duzenli oyuncularin degeri tipik ilk 11 degerinin bu payini gecerse uyari yazilir.
+MISSING_WARN = 0.12
 
 
 # --- Mac oncesi baglam -------------------------------------------------------------------
@@ -98,6 +104,11 @@ def _reasons(r: pd.Series, side: int) -> list[tuple[float, str]]:
             fs, ds = (hs, as_) if side >= 0 else (as_, hs)
             out.append((abs(hs - as_) / 1.2, f"{fav} son maclarda mac basina {fs:.1f} isabetli "
                                               f"sut uretiyor, {dog} {ds:.1f}."))
+    hx, ax = r.get("h_xg_for"), r.get("a_xg_for")
+    if pd.notna(hx) and pd.notna(ax) and side != 0 and (hx - ax) * side >= MIN_GAP["xg"]:
+        fx_, dx = (hx, ax) if side > 0 else (ax, hx)
+        out.append((abs(hx - ax) / 0.6, f"{fav} son maclarda mac basina {fx_:.1f} beklenen gol "
+                                        f"(xG, penaltisiz) uretiyor, {dog} {dx:.1f}."))
     hv, av = r.get("h_v_points"), r.get("a_v_points")
     if pd.notna(hv) and pd.notna(av) and side > 0 and hv - av > 0.5:
         out.append(((hv - av) / 0.8, f"{home} ic sahada mac basina {hv:.1f} puan aliyor, "
@@ -112,6 +123,17 @@ def _reasons(r: pd.Series, side: int) -> list[tuple[float, str]]:
 
 
 def _caution(r: pd.Series, best: str, p_best: float) -> str:
+    miss = {k: r.get(f"{k}_missing") for k in ("h", "a")}
+    miss = {k: v for k, v in miss.items() if pd.notna(v) and v >= MISSING_WARN
+            and isinstance(r.get(f"{k}_absent"), str)}
+    if miss:
+        k = max(miss, key=miss.get)
+        team = r["home_team"] if k == "h" else r["away_team"]
+        n = int(r.get(f"{k}_n_absent") or 0)
+        more = f" ve {n - 3} oyuncu daha" if n > 3 else ""
+        return (f"Dikkat: {team} takiminda duzenli oyunculardan {r[f'{k}_absent']}{more} "
+                f"sakat veya cezali (ilk 11 degerinin %{100 * miss[k]:.0f}'i); bu bilgi "
+                "modelin tahmininde yok.")
     mk = r.get("market_p_" + {"H": "home", "D": "draw", "A": "away"}[best])
     if pd.notna(mk) and abs(p_best - mk) >= 0.08:
         side = "iyimser" if p_best > mk else "kotumser"
@@ -126,8 +148,7 @@ def _caution(r: pd.Series, best: str, p_best: float) -> str:
     if p_best < 0.45:
         return (f"Dikkat: dengeli mac; en olasi sonucun olasiligi yalnizca {_pct(p_best)}, "
                 f"beraberlik {_pct(r['p_draw'])}.")
-    return (f"Dikkat: bu sonucun gerceklesmeme olasiligi {_pct(1 - p_best)}; kadro ve "
-            "sakatlik bilgisi modelde henuz yok.")
+    return f"Dikkat: bu sonucun gerceklesmeme olasiligi {_pct(1 - p_best)}."
 
 
 def note(r: pd.Series) -> list[str]:

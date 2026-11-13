@@ -1,8 +1,10 @@
 """Faz 11: FotMob'dan xG, kadro, hoca ve eksik oyuncu verisini artimli olarak toplar.
 
-Biten maclar data/reference/fotmob/ altina bir kez yazilir (git'e girer, yeniden
-indirilmez). Yaklasan maclarin eksik oyunculari her calismada yenilenir:
-data/clean/fotmob_upcoming.parquet.
+Biten maclar data/raw/fotmob/ altina bir kez yazilir; CI bu klasoru calismalar arasinda
+onbellekte (actions/cache) tutar, boylece ayni mac yeniden indirilmez. Git'e girmez: her
+calismada degisen buyuk dosyalar depoyu sisirirdi. Onbellek kaybolursa bu sezon yeniden
+indirilir (~600 istek). Yaklasan maclarin eksik oyunculari her calismada yenilenir:
+data/raw/fotmob/upcoming.parquet.
 
 Istek butcesi: resmi olmayan bir kaynagi yormamak icin calisma basina en fazla
 --budget istek atilir; geri kalan maclar sonraki calismalarda tamamlanir.
@@ -19,12 +21,12 @@ import logging
 
 import pandas as pd
 
-from footintel.config import CLEAN_DIR, CURRENT_SEASON, REFERENCE_DIR
+from footintel.config import CURRENT_SEASON, RAW_DIR
 from footintel.ingest import fotmob as FM
 from footintel.ingest.http import SourceUnavailable
 
 log = logging.getLogger("ingest_fotmob")
-OUT = REFERENCE_DIR / "fotmob"
+OUT = RAW_DIR / "fotmob"
 
 
 def main() -> None:
@@ -50,10 +52,11 @@ def main() -> None:
             left -= used
             if season == CURRENT_SEASON and not up.empty:
                 upcoming.append(up.assign(league=league))
+    up_path = OUT / "upcoming.parquet"
     if upcoming:
-        CLEAN_DIR.mkdir(parents=True, exist_ok=True)
-        pd.concat(upcoming, ignore_index=True).to_parquet(
-            CLEAN_DIR / "fotmob_upcoming.parquet", index=False)
+        pd.concat(upcoming, ignore_index=True).to_parquet(up_path, index=False)
+    elif up_path.exists():
+        up_path.unlink()                  # eski liste yanlis uyari uretmesin
     log.info("FotMob: %d istek kullanildi", args.budget - left)
 
 

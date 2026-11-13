@@ -91,13 +91,17 @@ def team_form(long: pd.DataFrame) -> pd.DataFrame:
     g = t.groupby("team", sort=False)
     for c in ("npxg_for", "npxg_against", "tilt", "xi_value"):
         t[f"f_{c}"] = g[c].transform(_ewm_prev)
-    # hoca: ayni hocayla ust uste kacinci mac (mac kadrosu macin hocasini verir). Yaklasan
-    # macta hoca bilinmez (NaN): degisim sayilmaz, son macin hocasi surer kabul edilir.
-    new = t["coach"].ne(g["coach"].shift(1)) & t["coach"].notna()
-    run = new.groupby(t["team"]).cumsum()
-    t["coach_games"] = t.groupby([t["team"], run]).cumcount()
-    first = g.cumcount() < NEW_COACH_GAMES          # verinin basi: hoca degisimi bilinmiyor
-    t["new_coach"] = np.where(first, np.nan, (t["coach_games"] < NEW_COACH_GAMES).astype(float))
+    # Hoca: bu hocanin bu takimla daha once kac maca ciktigi (toplam, ust uste degil).
+    # Toplam sayilir, cunku ceza alan hocanin yerine yardimcisi 1-2 mac cikinca asil hoca
+    # geri geldiginde "yeni hoca" sayilmamali. Yaklasan macta hoca bilinmez (NaN): son
+    # macin hocasi surer kabul edilir.
+    coach = g["coach"].ffill()
+    t["coach_games"] = t.groupby([t["team"], coach]).cumcount()
+    row = g.cumcount()
+    start = row.groupby([t["team"], coach]).transform("min")   # hocanin ilk gorundugu sira
+    known = start >= NEW_COACH_GAMES          # verinin basindaki hoca: ne zaman geldigi bilinmez
+    t["new_coach"] = np.where(~known & (t["coach_games"] < NEW_COACH_GAMES), np.nan,
+                              (t["coach_games"] < NEW_COACH_GAMES).astype(float))
     return t
 
 
@@ -146,11 +150,14 @@ def missing_share(reg: pd.DataFrame, squad: pd.DataFrame, typical: pd.DataFrame,
 
 
 def match_features(fx: pd.DataFrame, matches: pd.DataFrame, players: pd.DataFrame,
-                   upcoming: pd.DataFrame | None = None) -> pd.DataFrame:
+                   upcoming: pd.DataFrame | None = None, missing_from: str = "absent"
+                   ) -> pd.DataFrame:
     """fm_id basina mac oncesi FotMob ozellikleri (bitmis + yaklasan maclar).
 
     fx: tum fikstur (bitmis ve yaklasan); matches/players: bitmis mac detaylari;
     upcoming: yaklasan maclarin sakat/cezali listesi (players ile ayni kolonlar).
+    missing_from: gecmis maclarda eksik oyuncu tanimi. "absent": kadroda (ilk 11 + yedek)
+    olmayan duzenli oyuncu; "listed": FotMob'un o mac icin sakat/cezali listesindeki.
     """
     future = fx[~fx["fm_id"].isin(matches["fm_id"]) & ~fx["cancelled"]][["fm_id"]]
     long = team_long(pd.concat([matches, future], ignore_index=True), fx)
@@ -158,8 +165,12 @@ def match_features(fx: pd.DataFrame, matches: pd.DataFrame, players: pd.DataFram
     reg = regulars(players, long)
     typical = tf[["fm_id", "team", "f_xi_value"]].rename(
         columns={"team": "team_fm_id", "f_xi_value": "typical"})
-    done = players[players["role"].isin(["starter", "sub"])]
-    miss = [missing_share(reg[reg["fm_id"].isin(matches["fm_id"])], done, typical, True)]
+    past = reg[reg["fm_id"].isin(matches["fm_id"])]
+    if missing_from == "absent":
+        done = players[players["role"].isin(["starter", "sub"])]
+        miss = [missing_share(past, done, typical, True)]
+    else:
+        miss = [missing_share(past, players[players["role"] == "unavailable"], typical, False)]
     if upcoming is not None and not upcoming.empty:
         miss.append(missing_share(reg[reg["fm_id"].isin(upcoming["fm_id"])], upcoming,
                                   typical, False))
@@ -176,5 +187,55 @@ def match_features(fx: pd.DataFrame, matches: pd.DataFrame, players: pd.DataFram
         "d_missing": x["h_missing"] - x["a_missing"],
         "h_new_coach": x["h_new_coach"], "a_new_coach": x["a_new_coach"],
         "h_missing": x["h_missing"], "a_missing": x["a_missing"],
+        "h_xg_for": x["h_f_npxg_for"], "a_xg_for": x["a_f_npxg_for"],
     }, index=x.index)
     return out.reset_index()
+
+
+def absentees(fx: pd.DataFrame, matches: pd.DataFrame, players: pd.DataFrame,
+              upcoming: pd.DataFrame, top: int = 3) -> pd.DataFrame:
+    """Yaklasan maclarda sakat/cezali listesindeki DUZENLI oyuncular (en degerli `top` isim).
+
+    Dondurur: fm_id, team_fm_id, names ("A, B"), n (eksik duzenli oyuncu sayisi).
+    """
+    cols = ["fm_id", "team_fm_id", "names", "n"]
+    if upcoming is None or upcoming.empty:
+        return pd.DataFrame(columns=cols)
+    future = fx[~fx["fm_id"].isin(matches["fm_id"]) & ~fx["cancelled"]][["fm_id"]]
+    long = team_long(pd.concat([matches, future], ignore_index=True), fx)
+    reg = regulars(players, long)
+    key = ["fm_id", "team_fm_id", "player_id"]
+    m = reg.merge(upcoming[[*key, "name"]].drop_duplicates(key), on=key)
+    if m.empty:
+        return pd.DataFrame(columns=cols)
+    m = m.sort_values("value", ascending=False)
+    return (m.groupby(["fm_id", "team_fm_id"])
+            .agg(names=("name", lambda s: ", ".join(s.head(top))), n=("name", "size"))
+            .reset_index())
+
+
+def for_fixtures(fd: pd.DataFrame, fixtures: pd.DataFrame, fx: pd.DataFrame,
+                 matches: pd.DataFrame, players: pd.DataFrame,
+                 upcoming: pd.DataFrame | None) -> pd.DataFrame:
+    """Yaklasan maclar (match_key) icin xG formu ve eksik duzenli oyuncular.
+
+    fd: oynanmis maclar (takim eslemesi icin); fixtures: match_key, league, match_date,
+    home_team_id, away_team_id. Bu ozellikler modele girmez, yalnizca yazilarda kullanilir.
+    """
+    rows = fixtures.rename(columns={"match_key": "match_id"})[
+        ["match_id", "league", "match_date", "home_team_id", "away_team_id"]]
+    ln = link(pd.concat([fd, rows.assign(home_goals=np.nan, away_goals=np.nan)],
+                        ignore_index=True), fx)
+    ln = ln[ln["match_id"].isin(rows["match_id"])]
+    x = match_features(fx, matches, players, upcoming)
+    x = ln.merge(x, on="fm_id", how="left")
+    ab = absentees(fx, matches, players, upcoming)
+    f = fx.set_index("fm_id")
+    ab = ab.astype({"fm_id": "int64", "team_fm_id": "int64"})
+    for side in ("home", "away"):
+        x["team_fm_id"] = x["fm_id"].map(f[f"{side}_fm_id"])
+        x = x.merge(ab.rename(columns={"names": f"{side[0]}_absent", "n": f"{side[0]}_n_absent"}),
+                    on=["fm_id", "team_fm_id"], how="left").drop(columns="team_fm_id")
+    keep = ["h_xg_for", "a_xg_for", "h_missing", "a_missing", "h_absent", "a_absent",
+            "h_n_absent", "a_n_absent"]
+    return x.rename(columns={"match_id": "match_key"})[["match_key", *keep]]
