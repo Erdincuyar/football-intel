@@ -132,7 +132,7 @@ def _caution(r: pd.Series, best: str, p_best: float) -> str:
         n = int(r.get(f"{k}_n_absent") or 0)
         more = f" ve {n - 3} oyuncu daha" if n > 3 else ""
         return (f"Dikkat: {team} takiminda duzenli oyunculardan {r[f'{k}_absent']}{more} "
-                f"sakat veya cezali (ilk 11 degerinin %{100 * miss[k]:.0f}'i); bu bilgi "
+                f"sakat veya cezali (tipik ilk 11 degerinde %{100 * miss[k]:.0f} kayip); bu bilgi "
                 "modelin tahmininde yok.")
     mk = r.get("market_p_" + {"H": "home", "D": "draw", "A": "away"}[best])
     if pd.notna(mk) and abs(p_best - mk) >= 0.08:
