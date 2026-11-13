@@ -24,8 +24,9 @@ from footintel.analysis.eda import played
 from footintel.config import CLEAN_DIR, CURRENT_SEASON, LEAGUES, LEDGER_DIR
 from footintel.ingest import openfootball as OF
 from footintel.models import corners as C
+from footintel.models import outcome as O
 from footintel.models.live import predict_league
-from footintel.models.registry import CORNER_MODEL_FILE, MODEL_VERSION
+from footintel.models.registry import CORNER_MODEL_FILE, MODEL_VERSION, OUTCOME_MODEL_FILE
 
 log = logging.getLogger("build_preview")
 
@@ -39,6 +40,8 @@ def main() -> None:
     cur = fd[fd["season"] == CURRENT_SEASON]
     corner_reg = C.NBRegression.from_dict(
         json.loads((CLEAN_DIR / CORNER_MODEL_FILE).read_text()))
+    outcome_model = O.OutcomeModel.from_dict(
+        json.loads((CLEAN_DIR / OUTCOME_MODEL_FILE).read_text()))
     official = ledger.already_predicted(LEDGER_DIR, MODEL_VERSION)
 
     parts = []
@@ -57,7 +60,7 @@ def main() -> None:
                         LEAGUES[league].name, unmatched)
         if fx.empty:
             continue
-        preds = predict_league(results, fx, league, today, corner_reg)
+        preds = predict_league(results, fx, league, today, corner_reg, outcome_model)
         parts.append(P.prediction_rows(fx, preds, official, MODEL_VERSION, now))
         log.info("%s: %s, %d mac", LEAGUES[league].name, rnd[0].get("round"), len(fx))
 

@@ -18,6 +18,8 @@ click==8.5.0
     # via
     #   streamlit
     #   uvicorn
+cloudpickle==3.1.2
+    # via joblib
 duckdb==2.0.0
     # via footintel
 h11==0.16.0
@@ -32,6 +34,8 @@ jinja2==3.1.6
     # via
     #   altair
     #   pydeck
+joblib==1.6.0
+    # via scikit-learn
 jsonschema==4.26.0
     # via altair
 jsonschema-specifications==2025.9.1
@@ -39,17 +43,21 @@ jsonschema-specifications==2025.9.1
 markupsafe==3.0.4
     # via jinja2
 narwhals==2.28.0
-    # via altair
+    # via
+    #   altair
+    #   scikit-learn
 numpy==2.4.6 ; python_full_version < '3.12'
     # via
     #   pandas
     #   pydeck
+    #   scikit-learn
     #   scipy
     #   streamlit
 numpy==2.5.4 ; python_full_version >= '3.12'
     # via
     #   pandas
     #   pydeck
+    #   scikit-learn
     #   scipy
     #   streamlit
 packaging==26.3
@@ -90,13 +98,21 @@ rpds-py==2026.9.1
     # via
     #   jsonschema
     #   referencing
+scikit-learn==1.9.1
+    # via footintel
 scipy==1.17.1 ; python_full_version < '3.12'
-    # via footintel
+    # via
+    #   footintel
+    #   scikit-learn
 scipy==1.18.1 ; python_full_version >= '3.12'
-    # via footintel
+    # via
+    #   footintel
+    #   scikit-learn
 starlette==1.10.0
     # via streamlit
 streamlit==1.66.1
+threadpoolctl==3.8.0
+    # via scikit-learn
 truststore==0.10.5
     # via footintel
 typing-extensions==4.16.0

@@ -29,8 +29,9 @@ from footintel.clean.football_data import read_raw_csv
 from footintel.config import CLEAN_DIR, LEAGUES, LEDGER_DIR
 from footintel.ingest import football_data as fd_ingest
 from footintel.models import corners as C
+from footintel.models import outcome as O
 from footintel.models.live import predict_league
-from footintel.models.registry import CORNER_MODEL_FILE, MODEL_VERSION
+from footintel.models.registry import CORNER_MODEL_FILE, MODEL_VERSION, OUTCOME_MODEL_FILE
 
 log = logging.getLogger("predict_upcoming")
 HORIZON_DAYS = 10
@@ -71,9 +72,12 @@ def main() -> None:
     results = played(pd.read_parquet(CLEAN_DIR / "matches_football_data.parquet"))
     corner_reg = C.NBRegression.from_dict(
         json.loads((CLEAN_DIR / CORNER_MODEL_FILE).read_text()))
+    outcome_model = O.OutcomeModel.from_dict(
+        json.loads((CLEAN_DIR / OUTCOME_MODEL_FILE).read_text()))
     preds: dict[str, tuple] = {}
     for league in sorted(new["league"].unique()):
-        preds.update(predict_league(results, new, league, today, corner_reg))
+        preds.update(predict_league(results, new, league, today, corner_reg,
+                                    outcome_model))
     rows = ledger.build(new, preds, MODEL_VERSION, now, ledger.snapshot_hash(results))
 
     view = rows[rows["market"].isin(["1x2", "ou25", "btts"])].pivot_table(

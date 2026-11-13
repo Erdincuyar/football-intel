@@ -20,7 +20,7 @@ import pandas as pd
 
 from footintel.features.matchweek import add_matchweek
 
-HISTORY_VERSION = "hist-v2"            # v1 + ilk yari sonucu modeli
+HISTORY_VERSION = "hist-v3"            # v2 + 1X2 dc-mr-v3 (Faz 10)
 IDENTITY_COLS = ["match_id", "league", "season", "match_date", "home_team", "away_team",
                  "home_team_id", "away_team_id"]
 RESULT_WORDS = ("goals", "corners", "yellow", "red", "shots", "fouls", "ht_", "result",
@@ -34,11 +34,20 @@ HT_COLS = ["p_ht_home", "p_ht_draw", "p_ht_away", "pred_ht_result"]
 
 def assemble(fd: pd.DataFrame, bt: pd.DataFrame, cards: pd.DataFrame | None,
              created_at: pd.Timestamp, version: str = HISTORY_VERSION,
-             halftime: pd.DataFrame | None = None) -> pd.DataFrame:
-    """Mac kimligi + hafta + model tahminleri. Gercek sonuc kolonu ICERMEZ."""
+             halftime: pd.DataFrame | None = None,
+             outcome: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Mac kimligi + hafta + model tahminleri. Gercek sonuc kolonu ICERMEZ.
+
+    outcome: verilirse 1X2 olasiliklari bu walk-forward tablodan gelir (Faz 10, dc-mr-v3);
+    tabloda olmayan maclar cikarilir, boylece bir surumde iki model karismaz.
+    """
     ids = add_matchweek(fd[IDENTITY_COLS])                  # yalnizca kimlik kolonlari
     keep = ["match_id", "fit_date", *[c for c in PRED_COLS if c in bt]]
     out = ids.merge(bt[keep], on="match_id", how="inner")
+    if outcome is not None:
+        one_x_two = ["p_home", "p_draw", "p_away"]
+        out = out.drop(columns=one_x_two).merge(outcome[["match_id", *one_x_two]],
+                                                on="match_id", how="inner")
     if cards is not None and not cards.empty:
         out = out.merge(cards[["match_id", *CARD_COLS]], on="match_id", how="left")
     else:
