@@ -35,6 +35,61 @@ def load():
             store.read_table("evaluation_summary"))
 
 
+@st.cache_data(ttl=3600)
+def load_insights():
+    return (store.read_table("match_notes"), store.read_table("coupon_history"),
+            store.read_table("coupon_backtest"))
+
+
+def show_coupon(history: pd.DataFrame | None, backtest: pd.DataFrame | None) -> None:
+    """Haftanin kuponu: en son kaydedilen hafta, birlesik olasilik ve gecmis basari."""
+    if history is None or history.empty:
+        return
+    week = history["week"].max()
+    cp = history[history["week"] == week].copy()
+    st.subheader("Haftanin kuponu")
+    st.caption("Modelin en cok guvendigi secimler (1X2, 2.5, KG; mac basina bir, lig basina en "
+               "fazla iki). Kupon mactan once kaydedilir ve degistirilmez.")
+    cp["Mac"] = cp["home_team"] + " – " + cp["away_team"]
+    cp["Lig"] = cp["league"].map(ui.league_name)
+    cp["Sonuc"] = cp["won"].map(lambda w: "–" if pd.isna(w) else ("✓" if w else "✗"))
+    st.dataframe(cp[["Mac", "Lig", "selection", "prob", "Sonuc"]].assign(
+        prob=100 * cp["prob"]).rename(columns={"selection": "Secim", "prob": "Olasilik"}),
+        hide_index=True, use_container_width=True,
+        column_config={"Olasilik": st.column_config.ProgressColumn(
+            "Olasilik", format="%.0f%%", min_value=0, max_value=100)})
+    c1, c2 = st.columns(2)
+    c1.metric("Kuponun tutma olasiligi", ui.pct(cp["combined_prob"].iloc[0], 0),
+              help="Secimlerin olasiliklarinin carpimi (bagimsiz varsayilir)")
+    if backtest is not None and len(backtest):
+        c2.metric("Gecmis haftalarda tutan kupon", ui.pct(backtest["coupon_won"].mean(), 0),
+                  help=f"Ayni kural {len(backtest)} gecmis haftaya uygulandi; modelin beklentisi "
+                       f"{ui.pct(backtest['combined_prob'].mean(), 0)}")
+    st.caption("En guvenilir secimler genelde dusuk oranli favorilerdir: guvenilir, karli demek "
+               "degildir. " + ui.DISCLAIMER)
+
+
+def show_notes(notes: pd.DataFrame | None, keys: pd.Series) -> None:
+    """Mac basina 3 satirlik tahmin yazisi, iki sutunlu kartlar (telefonda tek sutun)."""
+    if notes is None or notes.empty:
+        return
+    n = notes[notes["match_key"].isin(set(keys))].sort_values(["match_date", "home_team"])
+    if n.empty:
+        return
+    st.subheader("Mac yorumlari")
+    st.caption("Her yorum yalnizca veride olan sayilara dayanir: tahmin, en guclu iki neden ve "
+               "bir uyari. Kadro ve sakatlik bilgisi henuz yok.")
+    cols = st.columns(2)
+    for i, r in enumerate(n.itertuples(index=False)):
+        with cols[i % 2].container(border=True):
+            st.markdown(f"**{r.home_team} – {r.away_team}**  \n"
+                        f"<span style='color:#a1a1aa;font-size:0.8rem'>"
+                        f"{ui.league_name(r.league)} · {pd.Timestamp(r.match_date):%d.%m}</span>",
+                        unsafe_allow_html=True)
+            st.markdown(f"{r.line1}  \n{r.line2}  \n<span style='color:#a1a1aa'>{r.line3}</span>",
+                        unsafe_allow_html=True)
+
+
 def ledger_wide(led: pd.DataFrame) -> pd.DataFrame:
     """Defterin uzun formatini mac basina tek satira cevirir (1X2, 2.5, KG, skor, korner)."""
     keys = ["match_key", "match_date", "league", "home_team", "away_team", "model_version"]
@@ -86,6 +141,7 @@ if pv is not None and not pv.empty:
         parts.append(p.assign(match_date=pd.to_datetime(p["match_date"]), status="On tahmin"))
 games = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
 
+notes, coupons, coupon_bt = load_insights()
 model_pct, base_pct, n_eval = season_kpi(summary)
 k1, k2, k3, k4 = st.columns(4)
 k1.metric("Yaklasan mac", len(games), help="Resmi defter + on tahmin")
@@ -103,7 +159,10 @@ if games.empty:
     st.info("Su an yaklasan mac yok." + (f" Son tahmin edilen maclar {last} tarihindeydi; "
                                           if last else " ")
             + "Yeni fikstur yayinlaninca CI tahminleri otomatik ekler.")
+    show_coupon(coupons, coupon_bt)
     st.stop()
+
+show_coupon(coupons, coupon_bt)
 
 league = ui.pick("Lig", sorted(games["league"].unique()), "league", all_label="Tum ligler",
                  format_func=ui.league_name)
@@ -146,3 +205,6 @@ if {"p_home_corners45", "p_away_corners45"} <= set(corner.columns) and len(corne
                            for c in ("Ev 4.5 Ust", "Dep 4.5 Ust", "Toplam 9.5 Ust*")})
         st.caption("* Dusuk guven: toplam korner modeli lig ortalamasindan anlamli olarak iyi "
                    "degil. Takim bazli korner tahminleri anlamli olarak daha iyi.")
+
+key_col = g["match_key"] if "match_key" in g else pd.Series(dtype=str)
+show_notes(notes, key_col)

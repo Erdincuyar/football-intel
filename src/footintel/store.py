@@ -41,7 +41,9 @@ APP_TABLES = ["matches_football_data", "backtest_predictions", "style_profile",
               "tactics_team_match_1516", "style_now",
               # Faz 9 turetilmis tablolar (her calismada bastan uretilir; tahminler degil)
               "match_results", "prediction_evaluation", "evaluation_summary",
-              "evaluation_metrics", "preview_predictions"]
+              "evaluation_metrics", "preview_predictions",
+              # Faz 11: tahmin yazilari ve kupon
+              "match_notes", "coupon_backtest", "coupon_history"]
 APP_JSON = ["tactics_proxy", "tactics_summary", "xt_grid", "matchup_rules",
             "style_thresholds", "style_clusters", "cards_eval", "halftime_eval",
             "outcome_eval"]
