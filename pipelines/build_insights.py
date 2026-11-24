@@ -22,16 +22,46 @@ from footintel import ledger
 from footintel.analysis import history_eval as E
 from footintel.analysis import insights as I
 from footintel.analysis.eda import played
-from footintel.config import CLEAN_DIR, LEDGER_DIR
+from footintel.config import CLEAN_DIR, CURRENT_SEASON, LEDGER_DIR, RAW_DIR
+from footintel.features import fotmob as FF
 
 log = logging.getLogger("build_insights")
 COUPON_DIR = LEDGER_DIR / "coupons"
 ROUND_DAYS = 4          # bir hafta sonu turu: ilk mactan itibaren Cuma-Pazartesi
+FOTMOB_DIR = RAW_DIR / "fotmob"
+
+
+def fotmob_context(results: pd.DataFrame, preview: pd.DataFrame) -> pd.DataFrame | None:
+    """Bu sezonun FotMob verisinden xG formu ve eksik duzenli oyuncular (yoksa None)."""
+    def load(kind: str) -> pd.DataFrame:
+        files = sorted(FOTMOB_DIR.glob(f"{kind}_*_{CURRENT_SEASON}.parquet"))
+        return pd.concat([pd.read_parquet(f) for f in files], ignore_index=True) \
+            if files else pd.DataFrame()
+
+    fx, ms, ps = load("fixtures"), load("matches"), load("players")
+    if fx.empty or ms.empty:
+        log.info("FotMob verisi yok; yazilar onsuz uretilir")
+        return None
+    up_path = FOTMOB_DIR / "upcoming.parquet"
+    up = pd.read_parquet(up_path) if up_path.exists() else None
+    try:
+        out = FF.for_fixtures(results[results["season"] == CURRENT_SEASON], preview, fx, ms,
+                              ps, up)
+    except (KeyError, ValueError) as exc:      # resmi olmayan kaynak: bicim degisebilir
+        log.warning("FotMob baglami uretilemedi (%s); yazilar onsuz uretilir", exc)
+        return None
+    log.info("FotMob: %d/%d mac eslesti, %d macta eksik duzenli oyuncu", out["h_xg_for"].notna()
+             .sum(), len(preview), int((out[["h_absent", "a_absent"]].notna().any(axis=1)).sum()))
+    return out
 
 
 def notes_table(preview: pd.DataFrame, results: pd.DataFrame, led: pd.DataFrame) -> pd.DataFrame:
     ctx = I.context(results, preview)
-    d = I.add_market(preview.merge(ctx, on="match_key", how="left"), led)
+    d = preview.merge(ctx, on="match_key", how="left")
+    fm = fotmob_context(results, preview)
+    if fm is not None:
+        d = d.merge(fm, on="match_key", how="left")
+    d = I.add_market(d, led)
     rows = []
     for _, r in d.iterrows():
         l1, l2, l3 = I.note(r)
@@ -99,7 +129,9 @@ def main() -> None:
         notes = notes_table(preview, results, led)
         notes.to_parquet(CLEAN_DIR / "match_notes.parquet", index=False)
         log.info("Tahmin yazisi: %d mac", len(notes))
-        for r in notes.head(3).itertuples(index=False):
+        warn = notes[notes["line3"].str.contains("sakat veya cezali")]
+        log.info("Eksik oyuncu uyarisi: %d mac", len(warn))
+        for r in pd.concat([notes.head(3), warn.head(3)]).itertuples(index=False):
             log.info("%s - %s\n  %s\n  %s\n  %s", r.home_team, r.away_team, r.line1, r.line2,
                      r.line3)
         save_coupon(preview, today)

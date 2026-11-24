@@ -98,3 +98,16 @@ def test_coupon_backtest_skips_unfinished_weeks():
     row = bt.iloc[0]
     assert row["n_picks"] == 2 and row["picks_won"] == 1 and not row["coupon_won"]
     assert row["combined_prob"] == pytest.approx(0.64)
+
+
+def test_caution_names_missing_regulars_first():
+    r = pd.Series({"home_team": "Ev", "away_team": "Dep", "p_home": 0.6, "p_draw": 0.25,
+                   "p_away": 0.15, "p_over25": 0.5, "p_btts": 0.5, "h_missing": 0.05,
+                   "a_missing": 0.3, "a_absent": "A, B, C", "a_n_absent": 4})
+    line = I.note(r)[2]
+    assert line.startswith("Dikkat: Dep takiminda") and "A, B, C ve 1 oyuncu daha" in line
+    assert "%30" in line
+    # esigin altindaki eksik uyari sayilmaz
+    assert "takiminda" not in I.note(r.drop(["a_absent"]))[2]
+    assert "takiminda" not in I.note(pd.concat([r.drop("a_missing"),
+                                                pd.Series({"a_missing": 0.05})]))[2]
