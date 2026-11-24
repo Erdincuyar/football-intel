@@ -23,15 +23,24 @@ class PoliteSession:
         self._last = 0.0
 
     def get(self, url: str, retries: int = 3, **kwargs) -> requests.Response:
-        """5xx (sunucu tarafi) hatalarinda artan beklemeyle (5, 10, 20 sn) yeniden dener.
+        """5xx hatalarinda ve baglanti kopmasinda artan beklemeyle (5, 10, 20 sn) yeniden dener.
 
         4xx hatalari yeniden denenmez: onlar bizim istegimizin yanlis oldugunu gosterir.
+        Sunucuya hic ulasilamazsa (zaman asimi, baglanti reddi) SourceUnavailable firlatilir;
+        boylece istege bagli kaynaklar (ClubElo, Understat, FotMob) tum hatti durdurmaz.
         """
         for attempt in range(retries + 1):
             wait = self.delay - (time.monotonic() - self._last)
             if wait > 0:
                 time.sleep(wait)
-            response = self.session.get(url, timeout=30, **kwargs)
+            try:
+                response = self.session.get(url, timeout=30, **kwargs)
+            except (requests.ConnectionError, requests.Timeout) as exc:
+                self._last = time.monotonic()
+                if attempt == retries:
+                    raise SourceUnavailable(f"{url}: {type(exc).__name__}") from exc
+                time.sleep(5 * 2**attempt)
+                continue
             self._last = time.monotonic()
             if response.status_code < 500 or attempt == retries:
                 return response
